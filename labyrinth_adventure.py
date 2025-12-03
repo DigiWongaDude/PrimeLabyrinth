@@ -2,6 +2,8 @@
 # ASCII adventure wrapper for the Prime Labyrinth
 # Uses: labyrinth_engine, labyrinth_search, labyrinth_text
 
+import argparse
+
 import labyrinth_engine as le
 import labyrinth_search as ls
 import labyrinth_text as lt
@@ -242,34 +244,25 @@ def turnaround_view(current_p, current_h):
     print(" ".join("└───┘" for _ in icons))
     print()
 
-    if not incoming:
-        print("No doors from the previous level lead into this room.\n")
-        return
-
-    # Hidden doors are all the other incoming rooms
-    hidden = [h for h in incoming if h != prev_h]
-
-    if not hidden:
-        print("No hidden doors into this room from the previous level.\n")
-        return
-	
-    print(f"Backroom scan: {len(hidden)} hidden doors found.\n")
-    print("\nI FOUND SOME HIDDEN DOORS !!!")
-    print("Hidden Doors:")
-    for i, h_prev in enumerate(hidden, start=2):
-        print(f" [{i}] {h_prev}")
     print()
 
-def start_again():
+def reset_state():
     """
-    Full reset: clear path, doors, and level tracking.
-    Return new starting room chosen by the user.
+    Clear path, doors, and level tracking so a fresh run can start.
     """
     global room_state, path_stack, prime_levels, next_level
     room_state.clear()
     path_stack.clear()
     prime_levels.clear()
     next_level = 1
+
+
+def start_again():
+    """
+    Full reset: clear path, doors, and level tracking.
+    Return new starting room chosen by the user.
+    """
+    reset_state()
     print("\nElevator voice: resetting the Labyrinth. Returning to the lobby.\n")
     return choose_start_prime_and_room()
 
@@ -277,6 +270,7 @@ def start_again():
 # ---------------- MAIN LOOP ----------------
 
 def main():
+    reset_state()
     start_p, start_h = choose_start_prime_and_room()
     p = start_p
     h = start_h
@@ -305,7 +299,7 @@ def main():
             continue
 
         if cmd == "T":
-            turnaround_view(p,h)
+            turnaround_view(p, h)
             continue
 
         if not cmd:
@@ -334,5 +328,50 @@ def main():
         h = target_h
 
 
+def demo_walk(steps: int):
+    """
+    Auto-run the labyrinth for a few forward steps using default start.
+    This lets automated environments show the game without manual input.
+    """
+    reset_state()
+    p = ls.DEFAULT_START_P
+    h = ls.DEFAULT_START_H
+
+    for _ in range(steps):
+        state, closed_indices = show_room(p, h)
+        doors = state["doors"]
+        opened = state["opened"]
+        nxt = state["nxt"]
+
+        if not closed_indices:
+            print("No closed doors remain. Demo stopping.")
+            return
+
+        if nxt is None:
+            print("Reached the edge of the Labyrinth. Demo stopping.")
+            return
+
+        idx = closed_indices[0]
+        opened[idx - 1] = True
+        path_stack.append({"p": p, "h": h})
+        p = nxt
+        h = doors[idx - 1]
+
+    # Show the final room state after the last automatic step
+    show_room(p, h)
+
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Prime Labyrinth ASCII adventure")
+    parser.add_argument(
+        "--demo",
+        type=int,
+        metavar="STEPS",
+        help="Auto-walk forward for STEPS moves using default start values.",
+    )
+    args = parser.parse_args()
+
+    if args.demo is not None:
+        demo_walk(max(args.demo, 0))
+    else:
+        main()
