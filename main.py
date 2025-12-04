@@ -5,6 +5,8 @@ Provides a simple splash screen and menu to reach existing modules.
 
 import time
 
+import pygame
+
 import labyrinth_adventure
 import labyrinth_engine
 
@@ -43,8 +45,15 @@ def main() -> None:
 
         if choice == "1":
             print("Launching ASCII adventure...\n")
-            labyrinth_adventure.main()
-            print("\nReturned to launcher.\n")
+            try:
+                labyrinth_adventure.main()
+            except pygame.error:
+                print(
+                    "Visual adventure is not available on this device. "
+                    "Pygame could not open a window.\n"
+                )
+            else:
+                print("\nReturned to launcher.\n")
         elif choice == "2":
             print("Opening prime probe...\n")
             labyrinth_engine.main()
