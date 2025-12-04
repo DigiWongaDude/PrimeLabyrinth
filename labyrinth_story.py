@@ -2,7 +2,7 @@
 # Storyboard + room signature generator for Prime Labyrinth
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 import labyrinth_engine as le
 
 
@@ -11,8 +11,8 @@ import labyrinth_engine as le
 @dataclass
 class RoomSignature:
     p: int
-    h: tuple[int, int, int]
-    prev_h: Optional[tuple[int, int, int]]
+    h: Tuple[int, int, int]
+    prev_h: Optional[Tuple[int, int, int]]
     total: int
     spread: int
     mod9: int
@@ -28,8 +28,8 @@ def _simple_apex(a: int, b: int, c: int) -> int:
 
 
 def build_signature(p: int,
-                    h: tuple[int, int, int],
-                    prev_h: Optional[tuple[int, int, int]] = None) -> RoomSignature:
+                    h: Tuple[int, int, int],
+                    prev_h: Optional[Tuple[int, int, int]] = None) -> RoomSignature:
     a, b, c = h
     total = a + b + c
     spread = max(h) - min(h)
@@ -106,7 +106,7 @@ def map_signature(sig: RoomSignature, step_index: int) -> dict:
 
 def print_storyboard(sig: RoomSignature,
                      params: dict,
-                     spoken_line: str | None = None) -> None:
+                     spoken_line: Optional[str] = None) -> None:
 
     title = f"P{sig.p}  room {sig.h}"
     style = f"Scene mood: {params['mood']}"
@@ -139,3 +139,10 @@ def print_storyboard(sig: RoomSignature,
     print("  Visual: Hand hovering between two handles.")
     print("  Camera: Small, nervous motion.")
     print()
+
+
+if __name__ == "__main__":
+    signature = build_signature(p=7, h=(2, 2, 3))
+    mapped_params = map_signature(signature, step_index=1)
+    print_storyboard(signature, mapped_params,
+                     spoken_line="We really shouldn't be here.")
