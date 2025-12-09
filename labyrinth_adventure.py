@@ -110,6 +110,10 @@ TEXT_COLOR = (230, 235, 245)
 TEXT_DIM = (170, 175, 185)
 DOOR_CLOSED_COLOR = (90, 140, 255)
 DOOR_OPEN_COLOR = (60, 90, 155)
+DOOR_W = 140
+DOOR_H = 260
+INNER_PAD = 10
+KNOB_R = 10
 
 
 def make_fonts():
@@ -131,8 +135,8 @@ def layout_doors(doors: list[tuple[int, int, int]], viewport_rect: pygame.Rect):
     margin_x = viewport_rect.width * 0.08
     usable_width = viewport_rect.width - 2 * margin_x
 
-    door_width = min(140, usable_width / max(n, 1) * 0.7)
-    door_height = 260
+    door_width = min(DOOR_W, usable_width / max(n, 1) * 0.7)
+    door_height = DOOR_H
 
     # Clamp height to viewport
     door_height = min(door_height, viewport_rect.height - 40)
@@ -148,6 +152,47 @@ def layout_doors(doors: list[tuple[int, int, int]], viewport_rect: pygame.Rect):
         rect.top = base_y
         result.append((rect, center_x, rect.top))
     return result
+
+
+def draw_single_door(
+    screen: pygame.Surface,
+    rect: pygame.Rect,
+    p: int,
+    h_triplet: tuple[int, int, int],
+    opened: bool,
+    fonts: dict,
+):
+    """
+    Draw a single door using the playground-style visuals.
+    """
+
+    base_color = DOOR_OPEN_COLOR if opened else DOOR_CLOSED_COLOR
+
+    pygame.draw.rect(screen, base_color, rect, border_radius=16)
+
+    inner = pygame.Rect(
+        rect.left + INNER_PAD,
+        rect.top + INNER_PAD,
+        rect.width - 2 * INNER_PAD,
+        rect.height - 2 * INNER_PAD,
+    )
+    pygame.draw.rect(screen, TEXT_COLOR, inner, 2, border_radius=10)
+
+    p_surf = fonts["door_label"].render(f"P{p}", True, TEXT_COLOR)
+    p_x = inner.centerx - p_surf.get_width() // 2
+    p_y = inner.top + 12
+    screen.blit(p_surf, (p_x, p_y))
+
+    knob_x = inner.centerx + inner.width // 4
+    knob_y = inner.centery + 10
+    pygame.draw.circle(screen, TEXT_COLOR, (knob_x, knob_y), KNOB_R, 2)
+
+    a, b, c = h_triplet
+    abc_str = f"{a:03d}  {b:03d}  {c:03d}"
+    abc_surf = fonts["small"].render(abc_str, True, TEXT_COLOR)
+    abc_x = inner.centerx - abc_surf.get_width() // 2
+    abc_y = inner.bottom - 28
+    screen.blit(abc_surf, (abc_x, abc_y))
 
 
 def draw_room(
@@ -199,22 +244,20 @@ def draw_room(
     click_map: list[tuple[int, pygame.Rect]] = []
 
     for idx, ((a, b, c), (rect, cx, ty)) in enumerate(zip(doors, door_layout), start=1):
-        # Panel
-        color = DOOR_OPEN_COLOR if opened[idx - 1] else DOOR_CLOSED_COLOR
-        pygame.draw.rect(screen, color, rect, border_radius=16)
+        draw_single_door(
+            screen=screen,
+            rect=rect,
+            p=p,
+            h_triplet=(a, b, c),
+            opened=opened[idx - 1],
+            fonts=fonts,
+        )
 
         # Door index
         label = fonts["door_label"].render(str(idx), True, TEXT_COLOR)
         label_rect = label.get_rect()
         label_rect.midbottom = (rect.centerx, rect.bottom - 8)
         screen.blit(label, label_rect)
-
-        # h-set above door
-        h_text = f"({a}, {b}, {c})"
-        h_surf = fonts["small"].render(h_text, True, TEXT_COLOR)
-        h_rect = h_surf.get_rect()
-        h_rect.midbottom = (rect.centerx, rect.top - 6)
-        screen.blit(h_surf, h_rect)
 
         click_map.append((idx, rect))
 
