@@ -2,7 +2,6 @@
 # Pygame visual adventure for the Prime Labyrinth
 
 import sys
-import math
 
 import pygame
 
@@ -24,6 +23,9 @@ room_state: dict[tuple[int, tuple[int, int, int]], dict] = {}
 # [{"p": int, "h": (a, b, c)}, ...]
 path_stack: list[dict] = []
 
+WALLS = ["front", "left", "back", "right"]
+current_wall_index = 0  # 0 = front
+
 
 # --------------- LOGIC HELPERS ---------------
 
@@ -42,11 +44,37 @@ def assign_level_for_prime(p: int) -> tuple[int, bool]:
 
 def reset_state() -> None:
     """Reset all global state for a fresh run."""
-    global room_state, path_stack, prime_levels, next_level
+    global room_state, path_stack, prime_levels, next_level, current_wall_index
     room_state.clear()
     path_stack.clear()
     prime_levels.clear()
     next_level = 1
+    current_wall_index = 0
+
+
+def current_wall() -> str:
+    return WALLS[current_wall_index]
+
+
+def rotate_wall_left():
+    global current_wall_index
+    current_wall_index = (current_wall_index + 1) % len(WALLS)
+
+
+def rotate_wall_right():
+    global current_wall_index
+    current_wall_index = (current_wall_index - 1) % len(WALLS)
+
+
+def flip_front_back():
+    global current_wall_index
+    wall = current_wall()
+    if wall == "front":
+        current_wall_index = WALLS.index("back")
+    elif wall == "back":
+        current_wall_index = WALLS.index("front")
+    else:
+        current_wall_index = WALLS.index("back")
 
 
 def get_or_create_room(p: int, h: tuple[int, int, int]) -> dict:
@@ -195,6 +223,79 @@ def draw_single_door(
     screen.blit(abc_surf, (abc_x, abc_y))
 
 
+def draw_front_wall(screen, fonts, p, h, state, viewport_rect):
+    doors = state["doors"]
+    opened = state["opened"]
+    door_layout = layout_doors(doors, viewport_rect)
+
+    click_map: list[tuple[int, pygame.Rect]] = []
+
+    for idx, ((a, b, c), (rect, _cx, _ty)) in enumerate(zip(doors, door_layout), start=1):
+        draw_single_door(
+            screen=screen,
+            rect=rect,
+            p=p,
+            h_triplet=(a, b, c),
+            opened=opened[idx - 1],
+            fonts=fonts,
+        )
+
+        label = fonts["door_label"].render(str(idx), True, TEXT_COLOR)
+        label_rect = label.get_rect()
+        label_rect.midbottom = (rect.centerx, rect.bottom - 8)
+        screen.blit(label, label_rect)
+
+        click_map.append((idx, rect))
+
+    return click_map
+
+
+def draw_back_wall(screen, fonts, p, h, state, viewport_rect):
+    if path_stack:
+        prev = path_stack[-1]
+        prev_p = prev["p"]
+        prev_h = prev["h"]
+    else:
+        prev_p = p
+        prev_h = h
+
+    door_layout = layout_doors([prev_h], viewport_rect)
+    rect, _cx, _ty = door_layout[0]
+
+    opened = bool(path_stack)
+    draw_single_door(
+        screen=screen,
+        rect=rect,
+        p=prev_p,
+        h_triplet=prev_h,
+        opened=opened,
+        fonts=fonts,
+    )
+
+    label = fonts["door_label"].render("Entrance", True, TEXT_COLOR)
+    label_rect = label.get_rect()
+    label_rect.midbottom = (rect.centerx, rect.bottom - 8)
+    screen.blit(label, label_rect)
+
+    return [(0, rect)]
+
+
+def draw_side_wall_left(screen, fonts, viewport_rect):
+    text = "Left wall: stats / graffiti"
+    surf = fonts["sub"].render(text, True, TEXT_DIM)
+    rect = surf.get_rect(center=viewport_rect.center)
+    screen.blit(surf, rect)
+    return []
+
+
+def draw_side_wall_right(screen, fonts, viewport_rect):
+    text = "Right wall: more info / artwork"
+    surf = fonts["sub"].render(text, True, TEXT_DIM)
+    rect = surf.get_rect(center=viewport_rect.center)
+    screen.blit(surf, rect)
+    return []
+
+
 def draw_room(
     screen,
     fonts,
@@ -202,10 +303,7 @@ def draw_room(
     h: tuple[int, int, int],
     state: dict,
 ) -> list[tuple[int, pygame.Rect]]:
-    """
-    Draw the entire room.
-    Return mapping of door index -> rect for click detection.
-    """
+    """Draw the entire room and return click map for the active wall."""
     screen.fill(BACKGROUND_COLOR)
     width, height = screen.get_size()
 
@@ -237,32 +335,19 @@ def draw_room(
     legend_height = 40
     doors_top = top_margin + 110
     doors_bottom = height - legend_height - 10
-    doors_rect = pygame.Rect(0, doors_top, width, max(doors_bottom - doors_top, 80))
+    viewport_rect = pygame.Rect(0, doors_top, width, max(doors_bottom - doors_top, 80))
 
-    door_layout = layout_doors(doors, doors_rect)
+    wall = current_wall()
+    if wall == "front":
+        click_map = draw_front_wall(screen, fonts, p, h, state, viewport_rect)
+    elif wall == "back":
+        click_map = draw_back_wall(screen, fonts, p, h, state, viewport_rect)
+    elif wall == "left":
+        click_map = draw_side_wall_left(screen, fonts, viewport_rect)
+    else:
+        click_map = draw_side_wall_right(screen, fonts, viewport_rect)
 
-    click_map: list[tuple[int, pygame.Rect]] = []
-
-    for idx, ((a, b, c), (rect, cx, ty)) in enumerate(zip(doors, door_layout), start=1):
-        draw_single_door(
-            screen=screen,
-            rect=rect,
-            p=p,
-            h_triplet=(a, b, c),
-            opened=opened[idx - 1],
-            fonts=fonts,
-        )
-
-        # Door index
-        label = fonts["door_label"].render(str(idx), True, TEXT_COLOR)
-        label_rect = label.get_rect()
-        label_rect.midbottom = (rect.centerx, rect.bottom - 8)
-        screen.blit(label, label_rect)
-
-        click_map.append((idx, rect))
-
-    # Bottom legend
-    legend_text = "Press 1-9 or tap a door. R=reverse, S=restart, Q / ESC=quit."
+    legend_text = "Press 1-9 or tap a door. LEFT/RIGHT rotate, R flip view, S=restart, Q / ESC=quit."
     legend_surf = fonts["small"].render(legend_text, True, TEXT_DIM)
     legend_rect = legend_surf.get_rect()
     legend_rect.centerx = width // 2
@@ -307,10 +392,6 @@ def visual_loop(start_p: int, start_h: tuple[int, int, int]):
         state = get_or_create_room(p, h)
         click_map = draw_room(screen, fonts, p, h, state)
 
-        nxt = state["nxt"]
-        doors = state["doors"]
-        opened = state["opened"]
-
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -319,20 +400,31 @@ def visual_loop(start_p: int, start_h: tuple[int, int, int]):
                 if event.key in (pygame.K_q, pygame.K_ESCAPE):
                     running = False
 
+                elif event.key in (pygame.K_LEFT, pygame.K_a):
+                    rotate_wall_left()
+
+                elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                    rotate_wall_right()
+
                 elif event.key == pygame.K_r:
-                    p, h = reverse_step(p, h)
+                    flip_front_back()
 
                 elif event.key == pygame.K_s:
                     p, h = start_again()
 
                 elif pygame.K_1 <= event.key <= pygame.K_9:
-                    idx = event.key - pygame.K_0
-                    p, h = take_door(p, h, idx, state)
+                    if current_wall() == "front":
+                        idx = event.key - pygame.K_0
+                        p, h = take_door(p, h, idx, state)
 
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 idx = handle_click(event.pos, click_map)
                 if idx is not None:
-                    p, h = take_door(p, h, idx, state)
+                    wall = current_wall()
+                    if wall == "front":
+                        p, h = take_door(p, h, idx, state)
+                    elif wall == "back" and idx == 0:
+                        p, h = reverse_step(p, h)
 
     pygame.quit()
     print("\n[Labyrinth] Visual adventure ended. Goodbye.")
