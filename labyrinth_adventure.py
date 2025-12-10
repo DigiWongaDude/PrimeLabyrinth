@@ -10,6 +10,15 @@ import labyrinth_search as ls
 import labyrinth_text as lt
 
 
+DEBUG_LOG_TO_CONSOLE = False  # keep console quiet in Pyramide by default
+
+
+def log(message: str) -> None:
+    """Conditional logger so the visual game can stay silent by default."""
+    if DEBUG_LOG_TO_CONSOLE:
+        print(message)
+
+
 # --------------- GLOBAL STATE ---------------
 
 prime_levels: dict[int, int] = {}
@@ -132,20 +141,20 @@ def get_or_create_room(p: int, h: tuple[int, int, int]) -> dict:
 def reverse_step(current_p: int, current_h: tuple[int, int, int]):
     """Go back one step along the path stack if possible."""
     if not path_stack:
-        print("[Labyrinth] Already at the lobby. Cannot reverse.")
+        log("[Labyrinth] Already at the lobby. Cannot reverse.")
         return current_p, current_h
 
     last = path_stack.pop()
     p = last["p"]
     h = last["h"]
-    print(f"[Labyrinth] Reversed to P{p} room {h}.")
+    log(f"[Labyrinth] Reversed to P{p} room {h}.")
     return p, h
 
 
 def start_again():
     """Full reset and return starting (p, h)."""
     reset_state()
-    print("[Labyrinth] Reset to start room.")
+    log("[Labyrinth] Reset to start room.")
     # Reuse the search defaults, like the ASCII adventure
     return ls.DEFAULT_START_P, ls.DEFAULT_START_H
 
@@ -416,10 +425,10 @@ def visual_loop(start_p: int, start_h: tuple[int, int, int]):
     running = True
     click_map: list[tuple[int, pygame.Rect]] = []
 
-    print("pygame", pygame.version.ver, "running.")
-    print("Hello from the pygame community. https://www.pygame.org/contribute.html")
-    print("[Labyrinth] Visual adventure started.")
-    print("[Labyrinth] Q / ESC to quit.\n")
+    log("pygame " + pygame.version.ver + " running.")
+    log("Hello from the pygame community. https://www.pygame.org/contribute.html")
+    log("[Labyrinth] Visual adventure started.")
+    log("[Labyrinth] Q / ESC to quit.\n")
 
     while running:
         clock.tick(30)
@@ -462,7 +471,7 @@ def visual_loop(start_p: int, start_h: tuple[int, int, int]):
                         p, h = reverse_step(p, h)
 
     pygame.quit()
-    print("\n[Labyrinth] Visual adventure ended. Goodbye.")
+    log("\n[Labyrinth] Visual adventure ended. Goodbye.")
 
 
 def take_door(
@@ -477,22 +486,22 @@ def take_door(
     nxt = state["nxt"]
 
     if idx < 1 or idx > len(doors):
-        print(f"[Labyrinth] Door {idx} is not available in this room.")
+        log(f"[Labyrinth] Door {idx} is not available in this room.")
         return p, h
 
     if opened[idx - 1]:
-        print(f"[Labyrinth] Door {idx} is already open.")
+        log(f"[Labyrinth] Door {idx} is already open.")
         return p, h
 
     if nxt is None:
-        print("[Labyrinth] There is no next prime from here. Edge of the Labyrinth.")
+        log("[Labyrinth] There is no next prime from here. Edge of the Labyrinth.")
         return p, h
 
     opened[idx - 1] = True
     path_stack.append({"p": p, "h": h})
 
     target_h = doors[idx - 1]
-    print(f"[Labyrinth] Taking door {idx} -> P{nxt} room {target_h}.")
+    log(f"[Labyrinth] Taking door {idx} -> P{nxt} room {target_h}.")
 
     return nxt, target_h
 
