@@ -35,6 +35,22 @@ path_stack: list[dict] = []
 WALLS = ["front", "left", "back", "right"]
 current_wall_index = 0  # 0 = front
 
+# Left wall camera + gesture state (persists between rotations)
+LEFT_WALL_VIEW = {
+    "zoom": 1.0,
+    "offset_x": 0.0,
+    "offset_y": 0.0,
+    "fingers": {},  # finger_id -> (x, y) in screen coords
+    "last_pinch_dist": None,
+    "last_midpoint": None,
+}
+
+# Last known viewport for the left wall (to limit touch handling)
+left_wall_viewport_rect: pygame.Rect | None = None
+
+LEFT_WALL_MIN_ZOOM = 0.3
+LEFT_WALL_MAX_ZOOM = 4.0
+
 MAX_BREADCRUMB_ROOMS = 5
 
 
@@ -55,12 +71,22 @@ def assign_level_for_prime(p: int) -> tuple[int, bool]:
 
 def reset_state() -> None:
     """Reset all global state for a fresh run."""
-    global room_state, path_stack, prime_levels, next_level, current_wall_index
+    global room_state, path_stack, prime_levels, next_level, current_wall_index, LEFT_WALL_VIEW
     room_state.clear()
     path_stack.clear()
     prime_levels.clear()
     next_level = 1
     current_wall_index = 0
+    LEFT_WALL_VIEW.update(
+        {
+            "zoom": 1.0,
+            "offset_x": 0.0,
+            "offset_y": 0.0,
+            "fingers": {},
+            "last_pinch_dist": None,
+            "last_midpoint": None,
+        }
+    )
 
 
 def current_wall() -> str:
@@ -179,6 +205,145 @@ SIDE_BG = (8, 10, 20)
 DELTA_EDGE = (60, 90, 140)
 DELTA_NODE = (90, 190, 255)
 DELTA_CURRENT = (255, 210, 80)
+
+
+def clamp_zoom(z: float) -> float:
+    return max(LEFT_WALL_MIN_ZOOM, min(LEFT_WALL_MAX_ZOOM, z))
+
+
+def set_left_wall_viewport(rect: pygame.Rect | None) -> None:
+    global left_wall_viewport_rect
+    left_wall_viewport_rect = rect.copy() if rect is not None else None
+
+
+def transform_left_wall_point(point: tuple[float, float], rect: pygame.Rect):
+    """Apply left-wall zoom + pan to a local point inside rect."""
+
+    cx, cy = rect.center
+    x, y = point
+    zoom = LEFT_WALL_VIEW["zoom"]
+    ox = LEFT_WALL_VIEW["offset_x"]
+    oy = LEFT_WALL_VIEW["offset_y"]
+
+    sx = (x - cx) * zoom + cx + ox
+    sy = (y - cy) * zoom + cy + oy
+    return int(sx), int(sy)
+
+
+def screen_to_world(point: tuple[float, float], rect: pygame.Rect):
+    """Reverse the left-wall transform for a screen-space point."""
+
+    cx, cy = rect.center
+    zoom = LEFT_WALL_VIEW["zoom"]
+    ox = LEFT_WALL_VIEW["offset_x"]
+    oy = LEFT_WALL_VIEW["offset_y"]
+    sx, sy = point
+
+    wx = (sx - ox - cx) / zoom + cx
+    wy = (sy - oy - cy) / zoom + cy
+    return wx, wy
+
+
+def apply_zoom_with_focus(focus: tuple[float, float], zoom_factor: float, rect: pygame.Rect):
+    """Zoom toward focus point while keeping it anchored on screen."""
+
+    old_zoom = LEFT_WALL_VIEW["zoom"]
+    new_zoom = clamp_zoom(old_zoom * zoom_factor)
+    if new_zoom == old_zoom:
+        return
+
+    world_focus = screen_to_world(focus, rect)
+    cx, cy = rect.center
+
+    LEFT_WALL_VIEW["zoom"] = new_zoom
+    fx, fy = focus
+    wx, wy = world_focus
+    LEFT_WALL_VIEW["offset_x"] = fx - (wx - cx) * new_zoom - cx
+    LEFT_WALL_VIEW["offset_y"] = fy - (wy - cy) * new_zoom - cy
+
+
+def finger_distance(a: tuple[float, float], b: tuple[float, float]) -> float:
+    ax, ay = a
+    bx, by = b
+    return ((ax - bx) ** 2 + (ay - by) ** 2) ** 0.5
+
+
+def handle_left_wall_touch(event, screen_size: tuple[int, int]) -> None:
+    """Handle FINGER* events for the left wall viewport only."""
+
+    if current_wall() != "left":
+        return
+
+    rect = left_wall_viewport_rect
+    if rect is None:
+        return
+
+    width, height = screen_size
+    x = event.x * width
+    y = event.y * height
+
+    fingers = LEFT_WALL_VIEW["fingers"]
+
+    if event.type == pygame.FINGERDOWN:
+        if not rect.collidepoint(x, y):
+            return
+
+        fingers[event.finger_id] = (x, y)
+        if len(fingers) == 1:
+            LEFT_WALL_VIEW["last_midpoint"] = (x, y)
+            LEFT_WALL_VIEW["last_pinch_dist"] = None
+        elif len(fingers) >= 2:
+            pts = list(fingers.values())[:2]
+            LEFT_WALL_VIEW["last_pinch_dist"] = finger_distance(pts[0], pts[1])
+            LEFT_WALL_VIEW["last_midpoint"] = (
+                (pts[0][0] + pts[1][0]) / 2,
+                (pts[0][1] + pts[1][1]) / 2,
+            )
+
+    elif event.type == pygame.FINGERUP:
+        fingers.pop(event.finger_id, None)
+        if len(fingers) == 1:
+            (only_pos,) = fingers.values()
+            LEFT_WALL_VIEW["last_midpoint"] = only_pos
+            LEFT_WALL_VIEW["last_pinch_dist"] = None
+        elif not fingers:
+            LEFT_WALL_VIEW["last_midpoint"] = None
+            LEFT_WALL_VIEW["last_pinch_dist"] = None
+
+    elif event.type == pygame.FINGERMOTION:
+        if event.finger_id not in fingers:
+            return
+
+        fingers[event.finger_id] = (x, y)
+
+        if len(fingers) == 1:
+            midpoint = list(fingers.values())[0]
+            last_mid = LEFT_WALL_VIEW.get("last_midpoint")
+            if last_mid is not None:
+                dx = midpoint[0] - last_mid[0]
+                dy = midpoint[1] - last_mid[1]
+                LEFT_WALL_VIEW["offset_x"] += dx / LEFT_WALL_VIEW["zoom"]
+                LEFT_WALL_VIEW["offset_y"] += dy / LEFT_WALL_VIEW["zoom"]
+            LEFT_WALL_VIEW["last_midpoint"] = midpoint
+
+        elif len(fingers) >= 2:
+            pts = list(fingers.values())[:2]
+            midpoint = ((pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2)
+            last_mid = LEFT_WALL_VIEW.get("last_midpoint")
+            if last_mid is not None:
+                dx = midpoint[0] - last_mid[0]
+                dy = midpoint[1] - last_mid[1]
+                LEFT_WALL_VIEW["offset_x"] += dx / LEFT_WALL_VIEW["zoom"]
+                LEFT_WALL_VIEW["offset_y"] += dy / LEFT_WALL_VIEW["zoom"]
+
+            dist = finger_distance(pts[0], pts[1])
+            last_dist = LEFT_WALL_VIEW.get("last_pinch_dist")
+            if last_dist and last_dist > 0:
+                zoom_factor = dist / last_dist
+                apply_zoom_with_focus(midpoint, zoom_factor, rect)
+
+            LEFT_WALL_VIEW["last_midpoint"] = midpoint
+            LEFT_WALL_VIEW["last_pinch_dist"] = dist
 
 
 def make_fonts():
@@ -369,7 +534,7 @@ def draw_side_wall_left(
                 target_h = door_list[idx]
                 edges.append(((rp, rh), (nxt_prime, target_h)))
 
-    # Layout inside the wall rect
+    # Layout inside the wall rect (local coordinates before transform)
     primes = sorted({rp for (rp, _rh) in discovered_rooms})
     margin_x = 24
     margin_y = 28
@@ -395,15 +560,9 @@ def draw_side_wall_left(
     for src, dst in edges:
         if src not in positions or dst not in positions:
             continue
-        x1, y1 = positions[src]
-        x2, y2 = positions[dst]
-        pygame.draw.line(
-            screen,
-            DELTA_EDGE,
-            (int(x1), int(y1)),
-            (int(x2), int(y2)),
-            1,
-        )
+        x1, y1 = transform_left_wall_point(positions[src], rect)
+        x2, y2 = transform_left_wall_point(positions[dst], rect)
+        pygame.draw.line(screen, DELTA_EDGE, (x1, y1), (x2, y2), 1)
 
     # Optional current path highlight (overlay)
     path_rooms: list[tuple[int, tuple[int, int, int]]] = [
@@ -413,15 +572,9 @@ def draw_side_wall_left(
         a = path_rooms[i - 1]
         b = path_rooms[i]
         if a in positions and b in positions:
-            x1, y1 = positions[a]
-            x2, y2 = positions[b]
-            pygame.draw.line(
-                screen,
-                DELTA_CURRENT,
-                (int(x1), int(y1)),
-                (int(x2), int(y2)),
-                2,
-            )
+            x1, y1 = transform_left_wall_point(positions[a], rect)
+            x2, y2 = transform_left_wall_point(positions[b], rect)
+            pygame.draw.line(screen, DELTA_CURRENT, (x1, y1), (x2, y2), 2)
 
     # Draw nodes, highlighting current room
     for (rp, rh), (x, y) in positions.items():
@@ -432,8 +585,9 @@ def draw_side_wall_left(
             color = DELTA_NODE
             radius = 3
 
-        pygame.draw.circle(screen, color, (int(x), int(y)), radius)
-        pygame.draw.circle(screen, NODE_OUTLINE, (int(x), int(y)), radius, 1)
+        tx, ty = transform_left_wall_point((x, y), rect)
+        pygame.draw.circle(screen, color, (tx, ty), radius)
+        pygame.draw.circle(screen, NODE_OUTLINE, (tx, ty), radius, 1)
 
     # Label
     label = fonts["small"].render("delta map (open doors)", True, TEXT_DIM)
@@ -513,12 +667,16 @@ def draw_room(
 
     wall = current_wall()
     if wall == "front":
+        set_left_wall_viewport(None)
         click_map = draw_front_wall(screen, fonts, p, h, state, viewport_rect)
     elif wall == "back":
+        set_left_wall_viewport(None)
         click_map = draw_back_wall(screen, fonts, p, h, state, viewport_rect)
     elif wall == "left":
+        set_left_wall_viewport(viewport_rect)
         click_map = draw_side_wall_left(screen, fonts, p, h, viewport_rect)
     else:
+        set_left_wall_viewport(None)
         click_map = draw_side_wall_right(screen, fonts, viewport_rect)
 
     legend_text = "Press 1-9 or tap a door. LEFT/RIGHT rotate, R flip view, S=restart, Q / ESC=quit."
@@ -599,6 +757,13 @@ def visual_loop(start_p: int, start_h: tuple[int, int, int]):
                         p, h = take_door(p, h, idx, state)
                     elif wall == "back" and idx == 0:
                         p, h = reverse_step(p, h)
+
+            elif event.type in (
+                pygame.FINGERDOWN,
+                pygame.FINGERMOTION,
+                pygame.FINGERUP,
+            ):
+                handle_left_wall_touch(event, screen.get_size())
 
     pygame.quit()
     log("\n[Labyrinth] Visual adventure ended. Goodbye.")
