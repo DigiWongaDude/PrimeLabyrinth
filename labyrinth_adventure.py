@@ -2,7 +2,6 @@
 # Pygame visual adventure for the Prime Labyrinth
 
 import sys
-from collections import defaultdict
 
 import pygame
 
@@ -326,55 +325,72 @@ def draw_side_wall_left(
     rect: pygame.Rect,
 ) -> list[tuple[int, pygame.Rect]]:
     """
-    Left wall: mini 2D delta of the *path we have walked in this run*.
-    Uses path_stack + current (p, h). No clicks, just a visual.
+    Left wall: dynamically built delta map based solely on open doors.
+    Every room with an opened door (or the current room) becomes a node;
+    every opened door becomes an edge to its target room.
     """
     # Background + frame
     pygame.draw.rect(screen, SIDE_BG, rect)
     pygame.draw.rect(screen, TEXT_DIM, rect, 1)
 
-    # Build visit sequence: all rooms on the stack, then current
-    visits: list[tuple[int, tuple[int, int, int]]] = [
-        (entry["p"], entry["h"]) for entry in path_stack
-    ] + [(p, h)]
+    # Build discovered set from open doors plus current room
+    discovered_rooms: set[tuple[int, tuple[int, int, int]]] = set()
+    for (rp, rh), state in room_state.items():
+        if any(state.get("opened", [])):
+            discovered_rooms.add((rp, rh))
+    discovered_rooms.add((p, h))
 
-    if not visits:
-        label = fonts["small"].render("no path yet", True, TEXT_DIM)
+    if not discovered_rooms:
+        label = fonts["small"].render("no rooms yet", True, TEXT_DIM)
         screen.blit(label, (rect.left + 12, rect.top + 12))
         return []
 
-    # Map primes (levels) to vertical layers
-    primes = sorted({vp for (vp, _hh) in visits})
-    layer_for_prime = {vp: i for i, vp in enumerate(primes)}
+    # Build edges from opened doors
+    edges: list[tuple[tuple[int, tuple[int, int, int]], tuple[int, tuple[int, int, int]]]] = []
+    for (rp, rh) in discovered_rooms:
+        state = room_state.get((rp, rh))
+        if not state:
+            continue
+
+        opened = state.get("opened", [])
+        row, nxt_prime = le.build_row(rp)
+
+        door_list: list[tuple[int, int, int]] = []
+        for row_h, ds in row:
+            if row_h == rh:
+                door_list = list(ds)
+                break
+
+        if nxt_prime is None:
+            continue
+
+        for idx, was_open in enumerate(opened):
+            if was_open and idx < len(door_list):
+                target_h = door_list[idx]
+                edges.append(((rp, rh), (nxt_prime, target_h)))
 
     # Layout inside the wall rect
+    primes = sorted({rp for (rp, _rh) in discovered_rooms})
     margin_x = 24
     margin_y = 28
     max_layers = max(1, len(primes))
-    layer_gap = max(
-        24,
-        (rect.height - 2 * margin_y) // max_layers,
-    )
+    layer_gap = max(24, (rect.height - 2 * margin_y) // max_layers)
     col_gap = 18
 
-    counts_per_layer: dict[int, int] = defaultdict(int)
-    positions: list[tuple[int, tuple[int, int, int], float, float]] = []
+    positions: dict[tuple[int, tuple[int, int, int]], tuple[float, float]] = {}
+    for layer, prime in enumerate(primes):
+        rooms_in_prime = sorted([rh for (rp, rh) in discovered_rooms if rp == prime])
+        for col, rh in enumerate(rooms_in_prime):
+            x = rect.left + margin_x + col * col_gap
+            y = rect.top + margin_y + layer * layer_gap
+            positions[(prime, rh)] = (x, y)
 
-    for vp, vh in visits:
-        layer = layer_for_prime[vp]
-        col = counts_per_layer[layer]
-        counts_per_layer[layer] += 1
-
-        x = rect.left + margin_x + col * col_gap
-        # Higher primes nearer the top; layer 0 is the top prime
-        y = rect.bottom - margin_y - layer * layer_gap
-
-        positions.append((vp, vh, x, y))
-
-    # Draw edges between consecutive visits
-    for i in range(1, len(positions)):
-        _p1, _h1, x1, y1 = positions[i - 1]
-        _p2, _h2, x2, y2 = positions[i]
+    # Draw edges first
+    for src, dst in edges:
+        if src not in positions or dst not in positions:
+            continue
+        x1, y1 = positions[src]
+        x2, y2 = positions[dst]
         pygame.draw.line(
             screen,
             DELTA_EDGE,
@@ -383,9 +399,27 @@ def draw_side_wall_left(
             1,
         )
 
+    # Optional current path highlight (overlay)
+    path_rooms: list[tuple[int, tuple[int, int, int]]] = [
+        (entry["p"], entry["h"]) for entry in path_stack
+    ] + [(p, h)]
+    for i in range(1, len(path_rooms)):
+        a = path_rooms[i - 1]
+        b = path_rooms[i]
+        if a in positions and b in positions:
+            x1, y1 = positions[a]
+            x2, y2 = positions[b]
+            pygame.draw.line(
+                screen,
+                DELTA_CURRENT,
+                (int(x1), int(y1)),
+                (int(x2), int(y2)),
+                2,
+            )
+
     # Draw nodes, highlighting current room
-    for vp, vh, x, y in positions:
-        if vp == p and vh == h:
+    for (rp, rh), (x, y) in positions.items():
+        if rp == p and rh == h:
             color = DELTA_CURRENT
             radius = 4
         else:
@@ -396,7 +430,7 @@ def draw_side_wall_left(
         pygame.draw.circle(screen, NODE_OUTLINE, (int(x), int(y)), radius, 1)
 
     # Label
-    label = fonts["small"].render("path map (this run)", True, TEXT_DIM)
+    label = fonts["small"].render("delta map (open doors)", True, TEXT_DIM)
     screen.blit(label, (rect.left + 12, rect.top + 8))
 
     # No clickable regions on this wall (for now)
