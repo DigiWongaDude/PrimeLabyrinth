@@ -2,6 +2,7 @@
 # Pygame visual adventure for the Prime Labyrinth
 
 import sys
+from collections import defaultdict
 
 import pygame
 
@@ -174,6 +175,11 @@ DOOR_W = 140
 DOOR_H = 260
 INNER_PAD = 10
 KNOB_R = 10
+NODE_OUTLINE = (10, 20, 40)
+SIDE_BG = (8, 10, 20)
+DELTA_EDGE = (60, 90, 140)
+DELTA_NODE = (90, 190, 255)
+DELTA_CURRENT = (255, 210, 80)
 
 
 def make_fonts():
@@ -312,19 +318,103 @@ def draw_back_wall(screen, fonts, p, h, state, viewport_rect):
     return [(0, rect)]
 
 
-def draw_side_wall_left(screen, fonts, viewport_rect):
-    text = "Left wall: stats / graffiti"
-    surf = fonts["sub"].render(text, True, TEXT_DIM)
-    rect = surf.get_rect(center=viewport_rect.center)
-    screen.blit(surf, rect)
+def draw_side_wall_left(
+    screen: pygame.Surface,
+    fonts: dict,
+    p: int,
+    h: tuple[int, int, int],
+    rect: pygame.Rect,
+) -> list[tuple[int, pygame.Rect]]:
+    """
+    Left wall: mini 2D delta of the *path we have walked in this run*.
+    Uses path_stack + current (p, h). No clicks, just a visual.
+    """
+    # Background + frame
+    pygame.draw.rect(screen, SIDE_BG, rect)
+    pygame.draw.rect(screen, TEXT_DIM, rect, 1)
+
+    # Build visit sequence: all rooms on the stack, then current
+    visits: list[tuple[int, tuple[int, int, int]]] = [
+        (entry["p"], entry["h"]) for entry in path_stack
+    ] + [(p, h)]
+
+    if not visits:
+        label = fonts["small"].render("no path yet", True, TEXT_DIM)
+        screen.blit(label, (rect.left + 12, rect.top + 12))
+        return []
+
+    # Map primes (levels) to vertical layers
+    primes = sorted({vp for (vp, _hh) in visits})
+    layer_for_prime = {vp: i for i, vp in enumerate(primes)}
+
+    # Layout inside the wall rect
+    margin_x = 24
+    margin_y = 28
+    max_layers = max(1, len(primes))
+    layer_gap = max(
+        24,
+        (rect.height - 2 * margin_y) // max_layers,
+    )
+    col_gap = 18
+
+    counts_per_layer: dict[int, int] = defaultdict(int)
+    positions: list[tuple[int, tuple[int, int, int], float, float]] = []
+
+    for vp, vh in visits:
+        layer = layer_for_prime[vp]
+        col = counts_per_layer[layer]
+        counts_per_layer[layer] += 1
+
+        x = rect.left + margin_x + col * col_gap
+        # Higher primes nearer the top; layer 0 is the top prime
+        y = rect.bottom - margin_y - layer * layer_gap
+
+        positions.append((vp, vh, x, y))
+
+    # Draw edges between consecutive visits
+    for i in range(1, len(positions)):
+        _p1, _h1, x1, y1 = positions[i - 1]
+        _p2, _h2, x2, y2 = positions[i]
+        pygame.draw.line(
+            screen,
+            DELTA_EDGE,
+            (int(x1), int(y1)),
+            (int(x2), int(y2)),
+            1,
+        )
+
+    # Draw nodes, highlighting current room
+    for vp, vh, x, y in positions:
+        if vp == p and vh == h:
+            color = DELTA_CURRENT
+            radius = 4
+        else:
+            color = DELTA_NODE
+            radius = 3
+
+        pygame.draw.circle(screen, color, (int(x), int(y)), radius)
+        pygame.draw.circle(screen, NODE_OUTLINE, (int(x), int(y)), radius, 1)
+
+    # Label
+    label = fonts["small"].render("path map (this run)", True, TEXT_DIM)
+    screen.blit(label, (rect.left + 12, rect.top + 8))
+
+    # No clickable regions on this wall (for now)
     return []
 
 
-def draw_side_wall_right(screen, fonts, viewport_rect):
-    text = "Right wall: more info / artwork"
-    surf = fonts["sub"].render(text, True, TEXT_DIM)
-    rect = surf.get_rect(center=viewport_rect.center)
-    screen.blit(surf, rect)
+def draw_side_wall_right(
+    screen: pygame.Surface,
+    fonts: dict,
+    rect: pygame.Rect,
+) -> list[tuple[int, pygame.Rect]]:
+    """Right wall: reserved for stats / vibes later."""
+    pygame.draw.rect(screen, SIDE_BG, rect)
+    pygame.draw.rect(screen, TEXT_DIM, rect, 1)
+
+    label = fonts["small"].render("right wall – vibes coming soon", True, TEXT_DIM)
+    screen.blit(label, (rect.left + 12, rect.top + 12))
+
     return []
 
 
@@ -387,7 +477,7 @@ def draw_room(
     elif wall == "back":
         click_map = draw_back_wall(screen, fonts, p, h, state, viewport_rect)
     elif wall == "left":
-        click_map = draw_side_wall_left(screen, fonts, viewport_rect)
+        click_map = draw_side_wall_left(screen, fonts, p, h, viewport_rect)
     else:
         click_map = draw_side_wall_right(screen, fonts, viewport_rect)
 
