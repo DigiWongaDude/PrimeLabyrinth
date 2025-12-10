@@ -26,6 +26,8 @@ path_stack: list[dict] = []
 WALLS = ["front", "left", "back", "right"]
 current_wall_index = 0  # 0 = front
 
+MAX_BREADCRUMB_ROOMS = 5
+
 
 # --------------- LOGIC HELPERS ---------------
 
@@ -75,6 +77,27 @@ def flip_front_back():
         current_wall_index = WALLS.index("front")
     else:
         current_wall_index = WALLS.index("back")
+
+
+def build_breadcrumb(current_h: tuple[int, int, int]) -> str:
+    """Return a compact path string like '../223/335/355'."""
+    # use global path_stack
+    global path_stack
+
+    # Collect all h-triplets along the path, including current
+    hs = [entry["h"] for entry in path_stack] + [current_h]
+    if not hs:
+        return ""
+
+    # Limit to last N
+    visible = hs[-MAX_BREADCRUMB_ROOMS:]
+
+    def fmt(h: tuple[int, int, int]) -> str:
+        return "".join(str(d) for d in h)
+
+    parts = [fmt(h) for h in visible]
+    prefix = "../" if len(hs) > MAX_BREADCRUMB_ROOMS else ""
+    return prefix + "/".join(parts)
 
 
 def get_or_create_room(p: int, h: tuple[int, int, int]) -> dict:
@@ -331,9 +354,21 @@ def draw_room(
         line_surf = fonts["small"].render(line, True, TEXT_DIM)
         screen.blit(line_surf, (x_margin, top_margin + 60 + i * 18))
 
+    # Breadcrumb path (ball of string)
+    breadcrumb = build_breadcrumb(h)
+    y_after_summary = top_margin + 60 + len(summary_lines) * 18
+    if breadcrumb:
+        bc_surf = fonts["small"].render(f"path: {breadcrumb}", True, TEXT_DIM)
+        screen.blit(bc_surf, (x_margin, y_after_summary + 8))
+        breadcrumbs_bottom = y_after_summary + 8 + bc_surf.get_height()
+    else:
+        breadcrumbs_bottom = y_after_summary
+
     # Doors viewport: leave enough space at bottom for legend
     legend_height = 40
-    doors_top = top_margin + 110
+    # Ensure doors start below summary + breadcrumbs
+    min_doors_top = top_margin + 110
+    doors_top = max(breadcrumbs_bottom + 20, min_doors_top)
     doors_bottom = height - legend_height - 10
     viewport_rect = pygame.Rect(0, doors_top, width, max(doors_bottom - doors_top, 80))
 
