@@ -380,12 +380,15 @@ def draw_side_wall_left(
     positions: dict[tuple[int, tuple[int, int, int]], tuple[float, float]] = {}
     for layer, prime in enumerate(primes):
         rooms_in_prime = sorted([rh for (rp, rh) in discovered_rooms if rp == prime])
-        row_width = (len(rooms_in_prime) + 1) * col_gap
-        # row_width is always at least 2 * col_gap so start_x stays within rect
-        start_x = rect.left + margin_x + col_gap - row_width // 2
+
+        if not rooms_in_prime:
+            continue
+
+        row_width = (len(rooms_in_prime) - 1) * col_gap
+        start_x = rect.centerx - row_width / 2
+        y = rect.top + margin_y + layer * layer_gap
         for col, rh in enumerate(rooms_in_prime):
             x = start_x + col * col_gap
-            y = rect.top + margin_y + layer * layer_gap
             positions[(prime, rh)] = (x, y)
 
     # Draw edges first
