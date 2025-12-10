@@ -8,6 +8,7 @@ import time
 import pygame
 
 import labyrinth_adventure
+import labyrinth_delta
 import labyrinth_engine
 
 
@@ -32,6 +33,7 @@ def show_menu() -> None:
     print("Main Menu")
     print("  1) Start ASCII adventure")
     print("  2) Prime probe (engine CLI)")
+    print("  3) River delta map (2D)")
     print("  Q) Quit")
 
 
@@ -58,11 +60,22 @@ def main() -> None:
             print("Opening prime probe...\n")
             labyrinth_engine.main()
             print("\nReturned to launcher.\n")
+        elif choice == "3":
+            print("Opening river delta map...\n")
+            try:
+                labyrinth_delta.main()
+            except pygame.error:
+                print(
+                    "Delta map is not available on this device. "
+                    "Pygame could not open a window.\n"
+                )
+            else:
+                print("\nReturned to launcher.\n")
         elif choice == "q":
             print("Goodbye!")
             break
         else:
-            print("Invalid choice. Please select 1, 2, or Q.\n")
+            print("Invalid choice. Please select 1, 2, 3, or Q.\n")
 
 
 if __name__ == "__main__":
