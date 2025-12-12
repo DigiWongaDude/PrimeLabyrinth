@@ -25,7 +25,7 @@ prime_levels: dict[int, int] = {}
 next_level = 1
 
 # Per-room state
-# (p, h) -> {"doors": [...], "opened": [...], "nxt": int | None}
+# (p, h) -> {"doors": [...], "opened": [None | int | dict], "nxt": int | None}
 room_state: dict[tuple[int, tuple[int, int, int]], dict] = {}
 
 # Path stack for reverse
@@ -149,7 +149,7 @@ def build_breadcrumb(current_h: tuple[int, int, int]) -> str:
 def get_or_create_room(p: int, h: tuple[int, int, int]) -> dict:
     """
     Return state dict for room (p, h):
-      { "doors": [...], "opened": [bool...], "nxt": int | None }
+      { "doors": [...], "opened": [None | int | dict], "nxt": int | None }
     """
     key = (p, h)
     if key in room_state:
@@ -168,7 +168,7 @@ def get_or_create_room(p: int, h: tuple[int, int, int]) -> dict:
 
     state = {
         "doors": list(doors),
-        "opened": [False] * len(doors),
+        "opened": [None] * len(doors),
         "nxt": nxt,
     }
     room_state[key] = state
@@ -508,12 +508,13 @@ def draw_front_wall(screen, fonts, p, h, state, viewport_rect):
     click_map: list[tuple[int, pygame.Rect]] = []
 
     for idx, ((a, b, c), (rect, _cx, _ty)) in enumerate(zip(doors, door_layout), start=1):
+        door_open = bool(opened[idx - 1])
         draw_single_door(
             screen=screen,
             rect=rect,
             p=p,
             h_triplet=(a, b, c),
-            opened=opened[idx - 1],
+            opened=door_open,
             fonts=fonts,
         )
 
@@ -999,20 +1000,37 @@ def take_door(
         log(f"[Labyrinth] Door {idx} is not available in this room.")
         return p, h
 
-    if opened[idx - 1]:
-        log(f"[Labyrinth] Door {idx} is already open.")
-        return p, h
+    target_h = doors[idx - 1]
+    opened_link = opened[idx - 1]
+    parent_frame = {"visit_id": current_visit_id, "p": p, "h": h}
+
+    def child_visit(link):
+        if isinstance(link, dict):
+            return link.get("child")
+        return link
+
+    existing_child = child_visit(opened_link)
+    if existing_child is not None:
+        child_entry = visit_log.get(existing_child)
+        if child_entry:
+            path_stack.append(parent_frame)
+            current_visit_id = existing_child
+            log(f"[Labyrinth] Returning to door {idx} -> visit {existing_child}.")
+            return child_entry["p"], child_entry["h"]
+        else:
+            log(
+                f"[Labyrinth] Door {idx} had a missing visit link; creating a new visit instead."
+            )
 
     if nxt is None:
         log("[Labyrinth] There is no next prime from here. Edge of the Labyrinth.")
         return p, h
 
-    opened[idx - 1] = True
-    path_stack.append({"visit_id": current_visit_id, "p": p, "h": h})
+    path_stack.append(parent_frame)
 
-    target_h = doors[idx - 1]
     log(f"[Labyrinth] Taking door {idx} -> P{nxt} room {target_h}.")
-    register_visit(nxt, target_h, parent=current_visit_id)
+    child_visit_id = register_visit(nxt, target_h, parent=current_visit_id)
+    opened[idx - 1] = child_visit_id
 
     return nxt, target_h
 
