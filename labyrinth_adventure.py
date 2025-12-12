@@ -425,6 +425,38 @@ def draw_single_door(
     screen.blit(abc_surf, (abc_x, abc_y))
 
 
+# --------------- ROOM MUSIC / STRUDEL HOOKS ---------------
+
+def room_music_id(p: int, h: tuple[int, int, int]) -> str:
+    a, b, c = h
+    total = (p + a + b + c) % 4
+    if total == 0:
+        return "lab.low.bass"
+    if total == 1:
+        return "glass.drone"
+    if total == 2:
+        return "steps.plucked"
+    return "restless.perc"
+
+
+STRUDDEL_PATTERNS: dict[str, str] = {
+    "lab.low.bass": 's("bd ~ bd bd").bpm(80)',
+    "glass.drone": 'n("0 3 7 10").slow(4)',
+    "steps.plucked": 'n("c4 e4 g4 a4").fast(2)',
+    "restless.perc": 's("bd [hh*2] cp [hh*3]").bpm(110)',
+}
+
+
+def room_strudel_pattern(p: int, h: tuple[int, int, int]) -> tuple[str, str]:
+    """Return (music_id, strudel_pattern) for this room."""
+    music_id = room_music_id(p, h)
+    pattern = STRUDDEL_PATTERNS.get(
+        music_id,
+        "// (no pattern defined for this room yet)",
+    )
+    return music_id, pattern
+
+
 def draw_front_wall(screen, fonts, p, h, state, viewport_rect):
     doors = state["doors"]
     opened = state["opened"]
@@ -601,13 +633,52 @@ def draw_side_wall_right(
     screen: pygame.Surface,
     fonts: dict,
     rect: pygame.Rect,
+    p: int,
+    h: tuple[int, int, int],
 ) -> list[tuple[int, pygame.Rect]]:
-    """Right wall: reserved for stats / vibes later."""
+    """Right wall: room soundtrack info / Strudel pattern hint."""
     pygame.draw.rect(screen, SIDE_BG, rect)
     pygame.draw.rect(screen, TEXT_DIM, rect, 1)
 
-    label = fonts["small"].render("right wall – vibes coming soon", True, TEXT_DIM)
-    screen.blit(label, (rect.left + 12, rect.top + 12))
+    music_id, pattern = room_strudel_pattern(p, h)
+
+    x = rect.left + 12
+    y = rect.top + 12
+
+    header = fonts["small"].render("room soundtrack", True, TEXT_DIM)
+    screen.blit(header, (x, y))
+    y += header.get_height() + 8
+
+    mood_text = f"mood: {music_id}"
+    mood_surf = fonts["small"].render(mood_text, True, TEXT_COLOR)
+    screen.blit(mood_surf, (x, y))
+    y += mood_surf.get_height() + 12
+
+    label = fonts["small"].render("Strudel:", True, TEXT_DIM)
+    screen.blit(label, (x, y))
+    y += label.get_height() + 4
+
+    # Simple text wrapping for the Strudel pattern
+    max_width = rect.width - 24
+    words = pattern.split(" ")
+    lines: list[str] = []
+    current = ""
+
+    for word in words:
+        test = (current + " " + word).strip()
+        test_surf = fonts["small"].render(test, True, TEXT_COLOR)
+        if test_surf.get_width() > max_width and current:
+            lines.append(current)
+            current = word
+        else:
+            current = test
+    if current:
+        lines.append(current)
+
+    for line in lines:
+        line_surf = fonts["small"].render(line, True, TEXT_COLOR)
+        screen.blit(line_surf, (x, y))
+        y += line_surf.get_height() + 2
 
     return []
 
@@ -677,7 +748,7 @@ def draw_room(
         click_map = draw_side_wall_left(screen, fonts, p, h, viewport_rect)
     else:
         set_left_wall_viewport(None)
-        click_map = draw_side_wall_right(screen, fonts, viewport_rect)
+        click_map = draw_side_wall_right(screen, fonts, viewport_rect, p, h)
 
     legend_text = "Press 1-9 or tap a door. LEFT/RIGHT rotate, R flip view, S=restart, Q / ESC=quit."
     legend_surf = fonts["small"].render(legend_text, True, TEXT_DIM)
