@@ -430,7 +430,7 @@ def layout_doors(doors: list[tuple[int, int, int]], viewport_rect: pygame.Rect):
 def draw_single_door(
     screen: pygame.Surface,
     rect: pygame.Rect,
-    p: int,
+    door_prime: int,
     h_triplet: tuple[int, int, int],
     opened: bool,
     fonts: dict,
@@ -451,7 +451,7 @@ def draw_single_door(
     )
     pygame.draw.rect(screen, TEXT_COLOR, inner, 2, border_radius=10)
 
-    p_surf = fonts["door_label"].render(f"P{p}", True, TEXT_COLOR)
+    p_surf = fonts["door_label"].render(f"P{door_prime}", True, TEXT_COLOR)
     p_x = inner.centerx - p_surf.get_width() // 2
     p_y = inner.top + 12
     screen.blit(p_surf, (p_x, p_y))
@@ -507,12 +507,14 @@ def draw_front_wall(screen, fonts, p, h, state, viewport_rect):
 
     click_map: list[tuple[int, pygame.Rect]] = []
 
+    door_p = state["nxt"] if state["nxt"] is not None else p
+
     for idx, ((a, b, c), (rect, _cx, _ty)) in enumerate(zip(doors, door_layout), start=1):
         door_open = bool(opened[idx - 1])
         draw_single_door(
             screen=screen,
             rect=rect,
-            p=p,
+            door_prime=door_p,
             h_triplet=(a, b, c),
             opened=door_open,
             fonts=fonts,
@@ -544,7 +546,7 @@ def draw_back_wall(screen, fonts, p, h, state, viewport_rect):
     draw_single_door(
         screen=screen,
         rect=rect,
-        p=prev_p,
+        door_prime=prev_p,
         h_triplet=prev_h,
         opened=opened,
         fonts=fonts,
@@ -1002,25 +1004,22 @@ def take_door(
 
     target_h = doors[idx - 1]
     opened_link = opened[idx - 1]
+    if isinstance(opened_link, bool):
+        opened_link = None
     parent_frame = {"visit_id": current_visit_id, "p": p, "h": h}
 
-    def child_visit(link):
-        if isinstance(link, dict):
-            return link.get("child")
-        return link
-
-    existing_child = child_visit(opened_link)
-    if existing_child is not None:
-        child_entry = visit_log.get(existing_child)
+    if opened_link is not None:
+        child_entry = visit_log.get(opened_link)
         if child_entry:
             path_stack.append(parent_frame)
-            current_visit_id = existing_child
-            log(f"[Labyrinth] Returning to door {idx} -> visit {existing_child}.")
+            current_visit_id = opened_link
+            log(f"[Labyrinth] Returning to door {idx} -> visit {opened_link}.")
             return child_entry["p"], child_entry["h"]
         else:
             log(
                 f"[Labyrinth] Door {idx} had a missing visit link; creating a new visit instead."
             )
+            opened[idx - 1] = None
 
     if nxt is None:
         log("[Labyrinth] There is no next prime from here. Edge of the Labyrinth.")
