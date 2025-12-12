@@ -514,6 +514,40 @@ def draw_back_wall(screen, fonts, p, h, state, viewport_rect):
     return [(0, rect)]
 
 
+def draw_nav_button(screen, rect: pygame.Rect, label: str, fonts: dict):
+    pygame.draw.rect(screen, PANEL_COLOR, rect, border_radius=10)
+    pygame.draw.rect(screen, NODE_OUTLINE, rect, 2, border_radius=10)
+
+    text_surf = fonts["sub"].render(label, True, TEXT_COLOR)
+    text_rect = text_surf.get_rect(center=rect.center)
+    screen.blit(text_surf, text_rect)
+
+
+def draw_nav_buttons(screen, fonts, wall: str):
+    width, height = screen.get_size()
+    btn_w = 120
+    btn_h = 44
+    margin = 18
+    y = height - btn_h - 70
+
+    buttons: dict[str, pygame.Rect] = {}
+
+    left_rect = pygame.Rect(margin, y, btn_w, btn_h)
+    draw_nav_button(screen, left_rect, "Left", fonts)
+    buttons["left"] = left_rect
+
+    right_rect = pygame.Rect(width - margin - btn_w, y, btn_w, btn_h)
+    draw_nav_button(screen, right_rect, "Right", fonts)
+    buttons["right"] = right_rect
+
+    if wall == "front":
+        reverse_rect = pygame.Rect((width - btn_w) // 2, y, btn_w, btn_h)
+        draw_nav_button(screen, reverse_rect, "Reverse", fonts)
+        buttons["reverse"] = reverse_rect
+
+    return buttons
+
+
 def draw_side_wall_left(
     screen: pygame.Surface,
     fonts: dict,
@@ -689,8 +723,8 @@ def draw_room(
     p: int,
     h: tuple[int, int, int],
     state: dict,
-) -> list[tuple[int, pygame.Rect]]:
-    """Draw the entire room and return click map for the active wall."""
+) -> tuple[list[tuple[int, pygame.Rect]], dict[str, pygame.Rect]]:
+    """Draw the entire room and return click map and nav button rects."""
     screen.fill(BACKGROUND_COLOR)
     width, height = screen.get_size()
 
@@ -757,8 +791,10 @@ def draw_room(
     legend_rect.bottom = height - 10
     screen.blit(legend_surf, legend_rect)
 
+    nav_buttons = draw_nav_buttons(screen, fonts, wall)
+
     pygame.display.flip()
-    return click_map
+    return click_map, nav_buttons
 
 
 def handle_click(pos, click_map: list[tuple[int, pygame.Rect]]):
@@ -783,6 +819,7 @@ def visual_loop(start_p: int, start_h: tuple[int, int, int]):
 
     running = True
     click_map: list[tuple[int, pygame.Rect]] = []
+    nav_buttons: dict[str, pygame.Rect] = {}
 
     log("pygame " + pygame.version.ver + " running.")
     log("Hello from the pygame community. https://www.pygame.org/contribute.html")
@@ -793,7 +830,7 @@ def visual_loop(start_p: int, start_h: tuple[int, int, int]):
         clock.tick(30)
 
         state = get_or_create_room(p, h)
-        click_map = draw_room(screen, fonts, p, h, state)
+        click_map, nav_buttons = draw_room(screen, fonts, p, h, state)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -821,13 +858,28 @@ def visual_loop(start_p: int, start_h: tuple[int, int, int]):
                         p, h = take_door(p, h, idx, state)
 
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                idx = handle_click(event.pos, click_map)
-                if idx is not None:
-                    wall = current_wall()
-                    if wall == "front":
-                        p, h = take_door(p, h, idx, state)
-                    elif wall == "back" and idx == 0:
-                        p, h = reverse_step(p, h)
+                left_hit = nav_buttons.get("left") and nav_buttons["left"].collidepoint(event.pos)
+                right_hit = nav_buttons.get("right") and nav_buttons["right"].collidepoint(event.pos)
+                reverse_hit = (
+                    current_wall() == "front"
+                    and nav_buttons.get("reverse")
+                    and nav_buttons["reverse"].collidepoint(event.pos)
+                )
+
+                if left_hit:
+                    rotate_wall_left()
+                elif right_hit:
+                    rotate_wall_right()
+                elif reverse_hit:
+                    p, h = reverse_step(p, h)
+                else:
+                    idx = handle_click(event.pos, click_map)
+                    if idx is not None:
+                        wall = current_wall()
+                        if wall == "front":
+                            p, h = take_door(p, h, idx, state)
+                        elif wall == "back" and idx == 0:
+                            p, h = reverse_step(p, h)
 
             elif event.type in (
                 pygame.FINGERDOWN,
