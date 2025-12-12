@@ -71,7 +71,7 @@ def start_again():
 BG_COLOR = (5, 8, 16)
 TEXT_COLOR = (220, 220, 230)
 DOOR_CLOSED = (80, 140, 255)
-DOOR_OPEN = (60, 70, 110)
+DOOR_OPEN = (90, 150, 110)
 DOOR_EDGE = (10, 10, 20)
 
 def draw_room(screen, font, small_font, p: int, h: tuple[int, int, int], state: dict):
