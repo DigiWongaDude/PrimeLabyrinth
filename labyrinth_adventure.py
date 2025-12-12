@@ -460,6 +460,7 @@ def room_strudel_pattern(p: int, h: tuple[int, int, int]) -> tuple[str, str]:
 def draw_front_wall(screen, fonts, p, h, state, viewport_rect):
     doors = state["doors"]
     opened = state["opened"]
+    dest_p = state.get("nxt") or p
     door_layout = layout_doors(doors, viewport_rect)
 
     click_map: list[tuple[int, pygame.Rect]] = []
@@ -468,7 +469,7 @@ def draw_front_wall(screen, fonts, p, h, state, viewport_rect):
         draw_single_door(
             screen=screen,
             rect=rect,
-            p=p,
+            p=dest_p,
             h_triplet=(a, b, c),
             opened=opened[idx - 1],
             fonts=fonts,
