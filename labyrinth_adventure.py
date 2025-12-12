@@ -29,8 +29,14 @@ next_level = 1
 room_state: dict[tuple[int, tuple[int, int, int]], dict] = {}
 
 # Path stack for reverse
-# [{"p": int, "h": (a, b, c)}, ...]
+# [{"visit_id": int, "p": int, "h": (a, b, c)}, ...]
 path_stack: list[dict] = []
+
+# Visit log (each visit is unique)
+visit_log: dict[int, dict] = {}
+visit_order: list[int] = []
+current_visit_id: int | None = None
+next_visit_id = 1
 
 WALLS = ["front", "left", "back", "right"]
 current_wall_index = 0  # 0 = front
@@ -72,8 +78,13 @@ def assign_level_for_prime(p: int) -> tuple[int, bool]:
 def reset_state() -> None:
     """Reset all global state for a fresh run."""
     global room_state, path_stack, prime_levels, next_level, current_wall_index, LEFT_WALL_VIEW
+    global visit_log, visit_order, next_visit_id, current_visit_id
     room_state.clear()
     path_stack.clear()
+    visit_log.clear()
+    visit_order.clear()
+    next_visit_id = 1
+    current_visit_id = None
     prime_levels.clear()
     next_level = 1
     current_wall_index = 0
@@ -166,6 +177,7 @@ def get_or_create_room(p: int, h: tuple[int, int, int]) -> dict:
 
 def reverse_step(current_p: int, current_h: tuple[int, int, int]):
     """Go back one step along the path stack if possible."""
+    global current_visit_id
     if not path_stack:
         log("[Labyrinth] Already at the lobby. Cannot reverse.")
         return current_p, current_h
@@ -173,6 +185,7 @@ def reverse_step(current_p: int, current_h: tuple[int, int, int]):
     last = path_stack.pop()
     p = last["p"]
     h = last["h"]
+    current_visit_id = last.get("visit_id", current_visit_id)
     log(f"[Labyrinth] Reversed to P{p} room {h}.")
     return p, h
 
@@ -185,6 +198,36 @@ def start_again():
     return ls.DEFAULT_START_P, ls.DEFAULT_START_H
 
 
+# --------------- VISIT HELPERS ---------------
+
+
+def register_visit(p: int, h: tuple[int, int, int], parent: int | None = None) -> int:
+    """Create a new visit entry and make it current."""
+    global next_visit_id, current_visit_id
+
+    visit_id = next_visit_id
+    next_visit_id += 1
+
+    visit_log[visit_id] = {
+        "id": visit_id,
+        "p": p,
+        "h": h,
+        "parent": parent,
+    }
+    visit_order.append(visit_id)
+    current_visit_id = visit_id
+    return visit_id
+
+
+def current_path_visit_ids() -> list[int]:
+    """Return visit ids along the active path stack plus the current room."""
+
+    ids = [entry.get("visit_id") for entry in path_stack if entry.get("visit_id") is not None]
+    if current_visit_id is not None:
+        ids.append(current_visit_id)
+    return ids
+
+
 # --------------- PYGAME VISUALS ---------------
 
 WINDOW_WIDTH = 1280
@@ -195,7 +238,7 @@ PANEL_COLOR = (24, 32, 64)
 TEXT_COLOR = (230, 235, 245)
 TEXT_DIM = (170, 175, 185)
 DOOR_CLOSED_COLOR = (90, 140, 255)
-DOOR_OPEN_COLOR = (60, 90, 155)
+DOOR_OPEN_COLOR = (90, 150, 110)
 DOOR_W = 140
 DOOR_H = 260
 INNER_PAD = 10
@@ -556,95 +599,133 @@ def draw_side_wall_left(
     rect: pygame.Rect,
 ) -> list[tuple[int, pygame.Rect]]:
     """
-    Left wall: dynamically built delta map based solely on open doors.
-    Every room with an opened door (or the current room) becomes a node;
-    every opened door becomes an edge to its target room.
+    Left wall: visit graph using unique visits (no merging by room).
     """
+    from collections import defaultdict
+
     # Background + frame
     pygame.draw.rect(screen, SIDE_BG, rect)
     pygame.draw.rect(screen, TEXT_DIM, rect, 1)
 
-    # Build discovered set from open doors plus current room
-    discovered_rooms: set[tuple[int, tuple[int, int, int]]] = set()
-    for (rp, rh), state in room_state.items():
-        if any(state.get("opened", [])):
-            discovered_rooms.add((rp, rh))
-    discovered_rooms.add((p, h))
-
-    if not discovered_rooms:
-        label = fonts["small"].render("no rooms yet", True, TEXT_DIM)
+    if not visit_order:
+        label = fonts["small"].render("no visits yet", True, TEXT_DIM)
         screen.blit(label, (rect.left + 12, rect.top + 12))
         return []
 
-    # Build edges from opened doors
-    edges: list[tuple[tuple[int, tuple[int, int, int]], tuple[int, tuple[int, int, int]]]] = []
-    for (rp, rh) in discovered_rooms:
-        state = room_state.get((rp, rh))
-        if not state:
+    margin_y = 32
+    lane_gap = 70
+    min_gap = 28
+    centre_x = rect.centerx
+    base_y = rect.bottom - margin_y
+
+    # Depth calculation (parent distance from root)
+    depth_cache: dict[int, int] = {}
+
+    def depth_of(visit_id: int) -> int:
+        if visit_id in depth_cache:
+            return depth_cache[visit_id]
+        entry = visit_log.get(visit_id)
+        if not entry:
+            depth_cache[visit_id] = 0
+            return 0
+        parent = entry.get("parent")
+        if parent is None or parent not in visit_log:
+            depth_cache[visit_id] = 0
+            return 0
+        depth_cache[visit_id] = depth_of(parent) + 1
+        return depth_cache[visit_id]
+
+    max_depth = max(depth_of(vid) for vid in visit_order)
+    level_gap = max(36.0, (rect.height - 2 * margin_y) / max(max_depth, 1))
+
+    path_ids = current_path_visit_ids()
+    path_set = set(path_ids)
+
+    # Assign lanes relative to first divergence from the spine
+    lane_lookup: dict[int, tuple[int, int]] = {}
+    branch_order: dict[int | None, list[int]] = defaultdict(list)
+
+    def lane_for(visit_id: int) -> tuple[int, int]:
+        if visit_id in lane_lookup:
+            return lane_lookup[visit_id]
+        if visit_id in path_set:
+            lane_lookup[visit_id] = (0, 0)
+            return 0, 0
+        diverge = visit_id
+        parent = visit_log.get(diverge, {}).get("parent")
+        while parent is not None and parent not in path_set:
+            diverge = parent
+            parent = visit_log.get(parent, {}).get("parent")
+        anchor = parent
+        sequence = branch_order.setdefault(anchor, [])
+        if diverge not in sequence:
+            sequence.append(diverge)
+        idx = sequence.index(diverge)
+        direction = -1 if idx % 2 == 0 else 1
+        lane = idx // 2 + 1
+        lane_lookup[visit_id] = (direction, lane)
+        return direction, lane
+
+    # Compute positions (local coords)
+    positions: dict[int, tuple[float, float]] = {}
+    nodes_by_depth: defaultdict[int, list[int]] = defaultdict(list)
+
+    for vid in visit_order:
+        entry = visit_log.get(vid)
+        if not entry:
             continue
+        depth = depth_of(vid)
+        y = base_y - depth * level_gap
+        if vid in path_set:
+            x = centre_x
+        else:
+            direction, lane = lane_for(vid)
+            x = centre_x + direction * lane * lane_gap
+        positions[vid] = (x, y)
+        nodes_by_depth[depth].append(vid)
 
-        opened = state.get("opened", [])
-        row, nxt_prime = le.build_row(rp)
+    # Collision spreading per depth (center-out)
+    for depth, vids in nodes_by_depth.items():
+        left = sorted([vid for vid in vids if positions[vid][0] < centre_x], key=lambda v: positions[v][0], reverse=True)
+        prev_x = centre_x
+        for vid in left:
+            x, y = positions[vid]
+            if prev_x - x < min_gap:
+                x = prev_x - min_gap
+            positions[vid] = (x, y)
+            prev_x = x
 
-        door_list: list[tuple[int, int, int]] = []
-        for row_h, ds in row:
-            if row_h == rh:
-                door_list = list(ds)
-                break
-
-        if nxt_prime is None:
-            continue
-
-        for idx, was_open in enumerate(opened):
-            if was_open and idx < len(door_list):
-                target_h = door_list[idx]
-                edges.append(((rp, rh), (nxt_prime, target_h)))
-
-    # Layout inside the wall rect (local coordinates before transform)
-    primes = sorted({rp for (rp, _rh) in discovered_rooms})
-    margin_x = 24
-    margin_y = 28
-    max_layers = max(1, len(primes))
-    layer_gap = max(24, (rect.height - 2 * margin_y) // max_layers)
-    col_gap = 18
-
-    positions: dict[tuple[int, tuple[int, int, int]], tuple[float, float]] = {}
-    for layer, prime in enumerate(primes):
-        rooms_in_prime = sorted([rh for (rp, rh) in discovered_rooms if rp == prime])
-
-        if not rooms_in_prime:
-            continue
-
-        row_width = (len(rooms_in_prime) - 1) * col_gap
-        start_x = rect.centerx - row_width / 2
-        y = rect.top + margin_y + layer * layer_gap
-        for col, rh in enumerate(rooms_in_prime):
-            x = start_x + col * col_gap
-            positions[(prime, rh)] = (x, y)
+        right = sorted([vid for vid in vids if positions[vid][0] > centre_x], key=lambda v: positions[v][0])
+        prev_x = centre_x
+        for vid in right:
+            x, y = positions[vid]
+            if x - prev_x < min_gap:
+                x = prev_x + min_gap
+            positions[vid] = (x, y)
+            prev_x = x
 
     # Draw edges first
-    for src, dst in edges:
-        if src not in positions or dst not in positions:
+    for vid, entry in visit_log.items():
+        parent_id = entry.get("parent")
+        if parent_id is None or parent_id not in positions or vid not in positions:
             continue
-        x1, y1 = transform_left_wall_point(positions[src], rect)
-        x2, y2 = transform_left_wall_point(positions[dst], rect)
-        pygame.draw.line(screen, DELTA_EDGE, (x1, y1), (x2, y2), 1)
-
-    # Optional current path highlight (overlay)
-    path_rooms: list[tuple[int, tuple[int, int, int]]] = [
-        (entry["p"], entry["h"]) for entry in path_stack
-    ] + [(p, h)]
-    for i in range(1, len(path_rooms)):
-        a = path_rooms[i - 1]
-        b = path_rooms[i]
-        if a in positions and b in positions:
-            x1, y1 = transform_left_wall_point(positions[a], rect)
-            x2, y2 = transform_left_wall_point(positions[b], rect)
-            pygame.draw.line(screen, DELTA_CURRENT, (x1, y1), (x2, y2), 2)
+        x1, y1 = transform_left_wall_point(positions[parent_id], rect)
+        x2, y2 = transform_left_wall_point(positions[vid], rect)
+        on_path = vid in path_set and parent_id in path_set
+        color = DELTA_CURRENT if on_path else DOOR_OPEN_COLOR
+        width = 3 if on_path else 2
+        pygame.draw.line(screen, color, (x1, y1), (x2, y2), width)
 
     # Draw nodes, highlighting current room
-    for (rp, rh), (x, y) in positions.items():
-        if rp == p and rh == h:
+    for vid, (x, y) in positions.items():
+        entry = visit_log.get(vid)
+        if not entry:
+            continue
+        on_path = vid in path_set
+        if vid == current_visit_id:
+            color = DELTA_CURRENT
+            radius = 5
+        elif on_path:
             color = DELTA_CURRENT
             radius = 4
         else:
@@ -655,9 +736,17 @@ def draw_side_wall_left(
         pygame.draw.circle(screen, color, (tx, ty), radius)
         pygame.draw.circle(screen, NODE_OUTLINE, (tx, ty), radius, 1)
 
-    # Label
-    label = fonts["small"].render("delta map (open doors)", True, TEXT_DIM)
-    screen.blit(label, (rect.left + 12, rect.top + 8))
+        label_text = f"P{entry['p']} {entry['h']}"
+        label_surf = fonts["small"].render(label_text, True, TEXT_COLOR)
+        label_rect = label_surf.get_rect()
+        if x < centre_x:
+            label_rect.midright = (tx - 8, ty)
+        else:
+            label_rect.midleft = (tx + 8, ty)
+        screen.blit(label_surf, label_rect)
+
+    legend = fonts["small"].render("Green = visited door, Yellow = current path", True, TEXT_DIM)
+    screen.blit(legend, (rect.left + 12, rect.top + 8))
 
     # No clickable regions on this wall (for now)
     return []
@@ -816,6 +905,7 @@ def visual_loop(start_p: int, start_h: tuple[int, int, int]):
 
     p = start_p
     h = start_h
+    register_visit(p, h)
 
     running = True
     click_map: list[tuple[int, pygame.Rect]] = []
@@ -851,6 +941,7 @@ def visual_loop(start_p: int, start_h: tuple[int, int, int]):
 
                 elif event.key == pygame.K_s:
                     p, h = start_again()
+                    register_visit(p, h)
 
                 elif pygame.K_1 <= event.key <= pygame.K_9:
                     if current_wall() == "front":
@@ -899,6 +990,7 @@ def take_door(
     state: dict,
 ):
     """Take door idx in current state if possible, and return new (p, h)."""
+    global current_visit_id
     doors = state["doors"]
     opened = state["opened"]
     nxt = state["nxt"]
@@ -916,10 +1008,11 @@ def take_door(
         return p, h
 
     opened[idx - 1] = True
-    path_stack.append({"p": p, "h": h})
+    path_stack.append({"visit_id": current_visit_id, "p": p, "h": h})
 
     target_h = doors[idx - 1]
     log(f"[Labyrinth] Taking door {idx} -> P{nxt} room {target_h}.")
+    register_visit(nxt, target_h, parent=current_visit_id)
 
     return nxt, target_h
 
@@ -985,3 +1078,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
