@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prime Labyrinth</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero" id="top">
+    <div class="hero__content">
+      <p class="eyebrow">Mathematical storyscape</p>
+      <h1>Prime Labyrinth</h1>
+      <p class="hook">Navigate rooms etched with prime factors, choose doors, and trace your path through a hidden arithmetic maze.</p>
+      <div class="hero__actions">
+        <a class="button button--ghost" href="#premise">Read the premise</a>
+        <a class="button button--solid" href="#demo">See the demo</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel" id="premise">
+      <div class="panel__header">
+        <p class="label">The idea</p>
+        <h2>Rooms, doors, primes, and decision points</h2>
+      </div>
+      <div class="panel__body">
+        <p>Every chamber in the Prime Labyrinth is defined by a trio of numbers — its prime signature. Doors connect these signatures, hinting at the arithmetic that shaped them. Stepping through a door commits you to a new combination.</p>
+        <p>Some doors split your path in curious ways, others converge threads you left behind. The thrill comes from watching the breadcrumb trail build — a proof of your personal traversal through the maze.</p>
+        <p>Choices are rarely linear: pauses, reversals, and surprises turn the walk into a story. The Labyrinth rewards anyone willing to think in primes and embrace the branching narrative.</p>
+      </div>
+    </section>
+
+    <section class="panel panel--glow" id="demo">
+      <div class="panel__header">
+        <p class="label">Playable stub</p>
+        <h2>Demo: walk a handful of rooms</h2>
+      </div>
+      <div class="demo">
+        <div class="demo__status">
+          <div>
+            <p class="label">Current room</p>
+            <h3 id="roomName">P7 room (2,2,3)</h3>
+          </div>
+          <div class="badge" id="roomCode">223</div>
+        </div>
+
+        <div class="demo__doors">
+          <p class="label">Doors</p>
+          <div class="door-list" id="doorList"></div>
+        </div>
+
+        <div class="demo__controls">
+          <button class="button button--ghost" id="reverseBtn" type="button">Reverse</button>
+          <button class="button button--solid" id="restartBtn" type="button">Restart</button>
+        </div>
+
+        <div class="demo__breadcrumb">
+          <p class="label">Breadcrumb trail</p>
+          <p id="breadcrumbText">../223</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="devlog">
+      <div class="panel__header">
+        <p class="label">Progress</p>
+        <h2>Devlog</h2>
+      </div>
+      <div class="panel__body">
+        <ul class="devlog">
+          <li><span class="devlog__date">2024-06-01</span> Sketched the first sequence of prime-marked rooms.</li>
+          <li><span class="devlog__date">2024-07-15</span> Added reversible breadcrumbs to track detours.</li>
+          <li><span class="devlog__date">2024-08-20</span> Composed the cyan night theme for the interface.</li>
+          <li><span class="devlog__date">2024-09-05</span> Began linking door choices to story beats.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer__content">
+      <p>© Prime Labyrinth</p>
+      <p>Contact: maze@prime.example</p>
+    </div>
+    <a class="back-to-top" href="#top">Back to top</a>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
