@@ -69,7 +69,7 @@ function animate() {
   doors.forEach((door) => door.update(elapsed));
 
   pulsingMaterials.forEach((material, index) => {
-    const pulse = 2.2 + Math.sin(elapsed * 1.6 + index * 1.2) * 0.8;
+    const pulse = 1.35 + Math.sin(elapsed * 1.2 + index * 1.2) * 0.35;
     material.emissiveIntensity = pulse;
   });
 

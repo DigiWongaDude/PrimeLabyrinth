@@ -29,7 +29,7 @@ export function buildScene(camera: PerspectiveCamera): SceneContents {
   scene.background = new Color(0x04060b);
   scene.fog = new FogExp2(0x05060a, 0.022);
 
-  const ambient = new AmbientLight(0x0f1624, 0.12);
+  const ambient = new AmbientLight(0x0f1624, 0.2);
   scene.add(ambient);
 
   const corridorWidth = 16;
@@ -57,7 +57,7 @@ export function buildScene(camera: PerspectiveCamera): SceneContents {
       new MeshStandardMaterial({
         color,
         emissive: new Color(color),
-        emissiveIntensity: 2.4,
+        emissiveIntensity: 1.6,
         metalness: 0.35,
         roughness: 0.15,
       }),
@@ -149,6 +149,14 @@ export function buildScene(camera: PerspectiveCamera): SceneContents {
   const washLight = new PointLight(0x4de2ff, 1.6, 120, 1.5);
   washLight.position.set(0, corridorHeight * 0.8, corridorLength * 0.6);
   scene.add(washLight);
+
+  const guidanceLight = new PointLight(0x66d6ff, 0.9, corridorLength + 32, 1.2);
+  guidanceLight.position.set(0, corridorHeight * 0.55, corridorLength * 0.35);
+  scene.add(guidanceLight);
+
+  const endFill = new PointLight(0x9ddcff, 6.4, 64, 1.3);
+  endFill.position.set(0, corridorHeight * 0.9, doorZ - 4);
+  scene.add(endFill);
 
   const lookTarget = new Vector3(0, corridorHeight * 0.45, doorZ + 8);
   camera.position.set(0, corridorHeight * 0.42, startZ);
