@@ -30,19 +30,19 @@ export function buildScene(camera: PerspectiveCamera): SceneContents {
   scene.background = new Color(0x04060b);
   scene.fog = new FogExp2(0x05060a, 0.022);
 
-  const ambient = new AmbientLight(0x1a2840, 0.42);
-  scene.add(ambient);
-
-  const hemi = new HemisphereLight(0x7bd4ff, 0x0a0c14, 0.8);
-  hemi.position.set(0, corridorHeight * 1.4, 0);
-  scene.add(hemi);
-
   const corridorWidth = 16;
   const corridorHeight = 8;
   const segmentDepth = 10;
   const segments = 14;
   const corridorLength = segmentDepth * segments;
   const startZ = -24;
+
+  const ambient = new AmbientLight(0x1a2840, 0.42);
+  scene.add(ambient);
+
+  const hemi = new HemisphereLight(0x7bd4ff, 0x0a0c14, 0.8);
+  hemi.position.set(0, corridorHeight * 1.4, 0);
+  scene.add(hemi);
 
   const steel = new MeshStandardMaterial({
     color: 0x121a2c,
