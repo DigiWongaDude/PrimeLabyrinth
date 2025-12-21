@@ -63,6 +63,16 @@ Controls:
 
 The default view renders primes from 7 up to 59; adjust `MAX_PRIME` in the file to explore more (performance permitting).
 
+## Neon corridor web demo (Three.js)
+A browser-based neon sci-fi corridor built with Vite, TypeScript, and Three.js lives at the repository root.
+
+```bash
+npm install
+npm run dev
+```
+
+The camera auto-flies down a glowing corridor aligned to the +Z axis and stops in front of three closed, black-and-yellow hazard doors ready for future interactions.
+
 ## Supporting modules
 - `labyrinth_search.py` – helper search and walk algorithms, including defaults for the starting room `(7, (2, 2, 3))`.
 - `labyrinth_text.py` – text helpers used by the visual adventures for summaries and ASCII snippets.
