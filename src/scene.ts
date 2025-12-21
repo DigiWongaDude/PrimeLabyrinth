@@ -4,6 +4,7 @@ import {
   Color,
   FogExp2,
   Group,
+  HemisphereLight,
   Mesh,
   MeshStandardMaterial,
   PerspectiveCamera,
@@ -29,8 +30,12 @@ export function buildScene(camera: PerspectiveCamera): SceneContents {
   scene.background = new Color(0x04060b);
   scene.fog = new FogExp2(0x05060a, 0.022);
 
-  const ambient = new AmbientLight(0x0f1624, 0.2);
+  const ambient = new AmbientLight(0x1a2840, 0.42);
   scene.add(ambient);
+
+  const hemi = new HemisphereLight(0x7bd4ff, 0x0a0c14, 0.8);
+  hemi.position.set(0, corridorHeight * 1.4, 0);
+  scene.add(hemi);
 
   const corridorWidth = 16;
   const corridorHeight = 8;
@@ -40,15 +45,19 @@ export function buildScene(camera: PerspectiveCamera): SceneContents {
   const startZ = -24;
 
   const steel = new MeshStandardMaterial({
-    color: 0x0e1220,
-    metalness: 0.85,
-    roughness: 0.45,
+    color: 0x121a2c,
+    metalness: 0.82,
+    roughness: 0.4,
+    emissive: new Color(0x070b14),
+    emissiveIntensity: 0.18,
   });
 
   const trim = new MeshStandardMaterial({
-    color: 0x11192d,
+    color: 0x18263e,
     metalness: 0.65,
-    roughness: 0.35,
+    roughness: 0.33,
+    emissive: new Color(0x0c1220),
+    emissiveIntensity: 0.2,
   });
 
   const neonColors = [0x8a4fff, 0x35a6ff, 0xff5fd1];
@@ -57,7 +66,7 @@ export function buildScene(camera: PerspectiveCamera): SceneContents {
       new MeshStandardMaterial({
         color,
         emissive: new Color(color),
-        emissiveIntensity: 1.6,
+        emissiveIntensity: 2.1,
         metalness: 0.35,
         roughness: 0.15,
       }),
@@ -113,9 +122,9 @@ export function buildScene(camera: PerspectiveCamera): SceneContents {
     new MeshStandardMaterial({
       color: 0x0b0f18,
       metalness: 0.88,
-      roughness: 0.18,
-      emissive: new Color(0x05070f),
-      emissiveIntensity: 0.1,
+      roughness: 0.16,
+      emissive: new Color(0x0a0f1a),
+      emissiveIntensity: 0.22,
     }),
   );
   floor.rotation.x = -Math.PI / 2;
