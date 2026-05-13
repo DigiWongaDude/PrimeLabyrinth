@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Gents — Roblem Playground Mockup</title>
+<style>
+  :root{
+    --bg:#f6efe1;
+    --panel:#fffaf0;
+    --ink:#20242b;
+    --muted:#68717d;
+    --orange:#f57c00;
+    --blue:#435160;
+    --red:#d51008;
+    --cyan:#22f1ff;
+    --line:rgba(67,81,96,.18);
+  }
+
+  *{box-sizing:border-box}
+
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 15% 10%, rgba(245,124,0,.16), transparent 30%),
+      radial-gradient(circle at 88% 12%, rgba(34,241,255,.13), transparent 30%),
+      var(--bg);
+    color:var(--ink);
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    overflow:hidden;
+  }
+
+  .page{
+    position:relative;
+    min-height:100vh;
+    overflow:hidden;
+  }
+
+  header{
+    position:relative;
+    z-index:10;
+    width:min(1180px,92vw);
+    margin:0 auto;
+    padding:26px 0;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:18px;
+  }
+
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    font-weight:850;
+    letter-spacing:-.04em;
+    font-size:22px;
+  }
+
+  .mark{
+    width:32px;
+    height:48px;
+    display:grid;
+    grid-template-columns:repeat(6,1fr);
+    grid-template-rows:repeat(9,1fr);
+    gap:1px;
+  }
+
+  .mark span{background:var(--orange)}
+
+  nav{
+    display:flex;
+    gap:22px;
+    font-size:14px;
+    font-weight:750;
+  }
+
+  nav a{color:var(--ink);text-decoration:none;opacity:.75}
+
+  .hero{
+    position:relative;
+    z-index:5;
+    width:min(1180px,92vw);
+    margin:0 auto;
+    padding-top:42px;
+    display:grid;
+    grid-template-columns:minmax(280px,520px) 1fr;
+    gap:42px;
+    align-items:center;
+  }
+
+  h1{
+    margin:0;
+    font-size:clamp(44px,7vw,86px);
+    line-height:.9;
+    letter-spacing:-.075em;
+  }
+
+  .intro{
+    color:var(--muted);
+    font-size:18px;
+    line-height:1.65;
+    max-width:36em;
+    margin:24px 0 28px;
+  }
+
+  .buttons{display:flex;gap:12px;flex-wrap:wrap}
+
+  button{
+    border:0;
+    border-radius:999px;
+    padding:12px 17px;
+    background:var(--ink);
+    color:white;
+    font:inherit;
+    font-weight:800;
+    cursor:pointer;
+    box-shadow:0 12px 26px rgba(0,0,0,.12);
+  }
+
+  button.secondary{
+    background:var(--panel);
+    color:var(--ink);
+    border:1px solid var(--line);
+  }
+
+  .showcase{
+    position:relative;
+    min-height:430px;
+    border-radius:34px;
+    background:rgba(255,250,240,.72);
+    border:1px solid var(--line);
+    box-shadow:0 26px 90px rgba(0,0,0,.12);
+    overflow:hidden;
+  }
+
+  .showcase::before{
+    content:"";
+    position:absolute;inset:0;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg,var(--line) 1px, transparent 1px);
+    background-size:36px 36px;
+    opacity:.55;
+  }
+
+  .card-row{
+    position:absolute;
+    left:24px;right:24px;bottom:24px;
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:14px;
+    z-index:2;
+  }
+
+  .mini-card{
+    min-height:88px;
+    border-radius:18px;
+    background:rgba(255,255,255,.68);
+    border:1px solid var(--line);
+    padding:14px;
+    font-weight:800;
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  .orb{
+    position:absolute;
+    left:50%;top:35%;
+    width:180px;height:180px;
+    transform:translate(-50%,-50%);
+    border-radius:50%;
+    border:3px solid var(--cyan);
+    opacity:.25;
+    box-shadow:0 0 55px var(--cyan), inset 0 0 42px rgba(34,241,255,.2);
+  }
+
+  .playfield{
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    z-index:20;
+  }
+
+  .roblem{
+    --s:16px;
+    --c:var(--orange);
+    position:absolute;
+    width:calc(6 * var(--s));
+    height:calc(9 * var(--s));
+    pointer-events:auto;
+    cursor:pointer;
+    transform-origin:50% 100%;
+    transition:transform 300ms ease, scale 780ms cubic-bezier(.15,.85,.2,1.05);
+    filter:drop-shadow(0 12px 12px rgba(0,0,0,.14));
+  }
+
+  .roblem.is-walking{
+    animation:walkBob .34s ease-in-out infinite alternate;
+  }
+
+  .cell{
+    position:absolute;
+    width:var(--s);
+    height:var(--s);
+    left:calc(var(--x) * var(--s));
+    top:calc(var(--y) * var(--s));
+    background:var(--c);
+    box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.72);
+    transition:
+      transform 780ms cubic-bezier(.15,.85,.2,1.05),
+      opacity 620ms ease,
+      filter 620ms ease;
+  }
+
+  .materialising .cell{
+    transform:translate(calc(var(--dx) * 1px), calc(var(--dy) * 1px)) rotate(calc(var(--rot) * 1deg));
+    opacity:0;
+  }
+
+  .explode .cell{
+    transform:translate(calc(var(--dx) * 1px), calc(var(--dy) * 1px)) rotate(calc(var(--rot) * 1deg));
+    opacity:0;
+    filter:brightness(1.3);
+  }
+
+  .is-walking:not(.materialising):not(.explode) .foot-left{
+    animation:leftStep .34s ease-in-out infinite alternate;
+  }
+
+  .is-walking:not(.materialising):not(.explode) .foot-right{
+    animation:rightStep .34s ease-in-out infinite alternate;
+  }
+
+  .bouncing{animation:bounce .45s ease}
+  .thinking{animation:think .9s ease-in-out infinite alternate}
+
+  .redbox{
+    position:absolute;
+    width:22px;height:22px;
+    background:var(--red);
+    box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.72), 0 10px 14px rgba(0,0,0,.16);
+    border-radius:3px;
+    pointer-events:none;
+  }
+
+  .hint{
+    position:absolute;
+    left:50%;bottom:22px;
+    transform:translateX(-50%);
+    color:var(--muted);
+    font-size:13px;
+    font-weight:750;
+    z-index:25;
+    pointer-events:none;
+  }
+
+  @keyframes walkBob{
+    0%{translate:0 0}
+    100%{translate:0 -4px}
+  }
+
+  @keyframes leftStep{
+    0%{transform:translate(0, 0)}
+    100%{transform:translate(-3px, 2px)}
+  }
+
+  @keyframes rightStep{
+    0%{transform:translate(3px, 2px)}
+    100%{transform:translate(0, 0)}
+  }
+
+  @keyframes bounce{
+    0%,100%{scale:1}
+    35%{scale:1.16 .86}
+    65%{scale:.92 1.12}
+  }
+
+  @keyframes think{
+    from{rotate:0deg}
+    to{rotate:-8deg}
+  }
+
+  @media(max-width:850px){
+    nav{display:none}
+    .hero{grid-template-columns:1fr;padding-top:16px}
+    .showcase{min-height:330px}
+    .card-row{grid-template-columns:1fr;display:none}
+    .roblem{--s:13px}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div class="brand">
+      <div class="mark" id="logoMark"></div>
+      <span>AI Gents</span>
+    </div>
+    <nav><a href="#">Roblems</a><a href="#">Automation</a><a href="#">Systems</a><a href="#">Contact</a></nav>
+  </header>
+
+  <main class="hero">
+    <section>
+      <h1>Got problems?<br>Meet the Roblems.</h1>
+      <p class="intro">Tiny AI gents that appear when workflows get messy, patrol left and right, fix the boring bits, and occasionally explode for scientific reasons.</p>
+      <div class="buttons">
+        <button id="spawn">Summon Roblem</button>
+        <button class="secondary" id="chaos">More chaos</button>
+      </div>
+    </section>
+
+    <section class="showcase">
+      <div class="orb"></div>
+      <div class="card-row">
+        <div class="mini-card">workflow repair</div>
+        <div class="mini-card">data handoff</div>
+        <div class="mini-card">agent swarms</div>
+      </div>
+    </section>
+  </main>
+
+  <div class="playfield" id="playfield"></div>
+  <div class="hint">Up to three Roblems patrol left and right. Click one to bounce, then explode.</div>
+</div>
+
+<script>
+const playfield = document.getElementById('playfield');
+const spawnBtn = document.getElementById('spawn');
+const chaosBtn = document.getElementById('chaos');
+const logoMark = document.getElementById('logoMark');
+
+const standing = [
+  '001110',
+  '001110',
+  '001110',
+  '001100',
+  '001111',
+  '001100',
+  '001100',
+  '001110',
+  '001110'
+];
+
+const walking = [
+  '001110',
+  '001110',
+  '001110',
+  '001100',
+  '001111',
+  '001100',
+  '001100',
+  '110010',
+  '100011'
+];
+
+const colours = ['var(--orange)', 'var(--blue)'];
+const MAX_ROBLEMS = 3;
+const rand = (min,max) => Math.floor(Math.random() * (max - min + 1)) + min;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function buildLogo(){
+  logoMark.innerHTML = '';
+  standing.forEach((row,y) => [...row].forEach((v,x) => {
+    if(v !== '1') return;
+    const s = document.createElement('span');
+    s.style.gridColumn = x + 1;
+    s.style.gridRow = y + 1;
+    logoMark.appendChild(s);
+  }));
+}
+
+function makeRoblem({x, y, colour = colours[0], scale = 1} = {}){
+  if(playfield.children.length >= MAX_ROBLEMS) return null;
+
+  const r = document.createElement('div');
+  r.className = 'roblem materialising';
+  r.style.left = (x ?? rand(5,85)) + 'vw';
+  r.style.top = (y ?? rand(42,66)) + 'vh';
+  r.style.setProperty('--c', colour);
+  r.style.scale = 0.25;
+
+  const centreX = 3;
+  const centreY = 4.5;
+  walking.forEach((row, yy) => [...row].forEach((v, xx) => {
+    if(v !== '1') return;
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    if(yy >= 7 && xx < 3) cell.classList.add('foot-left');
+    if(yy >= 7 && xx >= 3) cell.classList.add('foot-right');
+    cell.style.setProperty('--x', xx);
+    cell.style.setProperty('--y', yy);
+    cell.style.setProperty('--dx', ((xx - centreX) * rand(40,80) + rand(-90,90)));
+    cell.style.setProperty('--dy', ((yy - centreY) * rand(35,75) + rand(-120,90)));
+    cell.style.setProperty('--rot', rand(-720,720));
+    r.appendChild(cell);
+  }));
+
+  r.addEventListener('click', async () => {
+    if(r.classList.contains('explode')) return;
+    r.classList.remove('is-walking');
+    r.classList.add('bouncing');
+    await sleep(420);
+    r.classList.remove('bouncing');
+    r.classList.add('explode');
+    setTimeout(() => r.remove(), 900);
+  });
+
+  playfield.appendChild(r);
+  requestAnimationFrame(() => {
+    r.classList.remove('materialising');
+    r.style.scale = scale;
+  });
+  wander(r);
+  return r;
+}
+
+async function wander(r){
+  await sleep(rand(700,1400));
+
+  while(document.body.contains(r) && !r.classList.contains('explode')){
+    const targetX = rand(2,88);
+    const currentX = parseFloat(r.style.left);
+    const facing = targetX >= currentX ? 1 : -1;
+    const travelTime = rand(2600,4600);
+
+    // left/right only: keep the same Y position forever
+    r.style.transform = `scaleX(${facing})`;
+    r.style.transition = `left ${travelTime}ms linear, transform 220ms ease, scale 780ms cubic-bezier(.15,.85,.2,1.05)`;
+    r.classList.add('is-walking');
+    r.style.left = targetX + 'vw';
+
+    await sleep(travelTime);
+    r.classList.remove('is-walking');
+    await sleep(rand(180,520));
+  }
+}
+
+function spawnRandom(){
+  makeRoblem({ colour: colours[rand(0, colours.length-1)], scale: Math.random() < .25 ? .78 : 1 });
+}
+
+spawnBtn.addEventListener('click', spawnRandom);
+chaosBtn.addEventListener('click', () => {
+  for(let i=0;i<MAX_ROBLEMS;i++) setTimeout(spawnRandom, i * 220);
+});
+
+buildLogo();
+for(let i=0;i<MAX_ROBLEMS;i++) setTimeout(spawnRandom, i * 650);
+setInterval(() => {
+  if(playfield.children.length < MAX_ROBLEMS) spawnRandom();
+}, 3200);
+</script>
+</body>
+</html>
