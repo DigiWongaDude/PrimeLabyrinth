@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 .DS_Store
 dist
+!browser_game/dist/
+!browser_game/dist/**
 npm-debug.log*
 .vscode/
 prime_labyrinth*.sqlite3*

@@ -2,6 +2,20 @@
 
 Explore a maze woven from prime numbers through a small collection of interactive tools and visualisers.
 
+## The Between — browser edition
+
+The dependency-free web version lives in `browser_game/`. It carries the same
+nine-key engine, directional entrances, deterministic colours, upper doorways
+and reachable crate stairs as the Pygame edition. Progress is stored in the
+browser and every visit has a shareable path link.
+
+```powershell
+node browser_game/serve.mjs
+```
+
+Open `http://127.0.0.1:4173`, or host the contents of `browser_game/dist/` on
+any static web server. See `browser_game/README.md` for verification details.
+
 ## The Between — isometric prototype
 
 The Equinox-inspired experiment lives independently in `isometric_game/` while
