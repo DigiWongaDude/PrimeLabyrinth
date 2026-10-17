@@ -18,6 +18,11 @@ On Windows, double-click `Play-Isometric-Labyrinth.bat`. On a tablet or Linux
 machine, clone or pull the `codex/pygame-explorers` branch and run the two
 commands above. See `isometric_game/README.md` for controls and options.
 
+PyramIDE on Android can run the dependency-free single-file edition directly:
+open `PrimeLabyrinth-PyramIDE.py` and press its green graphical Run arrow. This
+edition embeds the prime engine and provides touch controls, avoiding
+PyramIDE's project-folder and sibling-import limitations.
+
 ## The Between — 2D platform explorer
 
 Double-click **`Play-Prime-Labyrinth.bat`** on Windows. The launcher uses a local
