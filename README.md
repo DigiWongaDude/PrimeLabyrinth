@@ -6,8 +6,10 @@ Explore a maze woven from prime numbers through a small collection of interactiv
 
 The Equinox-inspired experiment lives independently in `isometric_game/` while
 sharing the proven Prime Labyrinth engine and path-address save model. Its
-cutaway rooms have deterministic exits on the north, west and east walls;
-additional exits can occupy raised ledges reached by glowing threshold lifts.
+cutaway rooms place exits opposite, left, right relative to the entrance,
+repeating that order for additional doors. Travel preserves doorway position
+and elevation on the matching wall in the next room. Taller walls and fixed
+crate stairs provide reachable upper landings, derived from room fundamentals.
 
 ```bash
 python -m pip install -r requirements-side-scroller.txt
@@ -21,7 +23,7 @@ commands above. See `isometric_game/README.md` for controls and options.
 PyramIDE on Android can run the single-file edition directly (Pygame required):
 open `PrimeLabyrinth-PyramIDE.py` and press its green graphical Run arrow. This
 edition embeds the prime engine and needs no sibling files. Tap/click the floor
-to walk, a doorway to walk there and enter, or the RETURN marker to retrace your
+to walk, a doorway to walk there and enter, or the RETURN doorway to retrace your
 path. An animated cloaked explorer carries a lantern. The desktop launcher uses
 this same renderer and input handling. The standalone edition currently keeps
 its route only for the running session; desktop saves still persist.

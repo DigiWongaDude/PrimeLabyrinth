@@ -5,6 +5,7 @@ It intentionally has no local-module or project-folder dependencies.
 """
 import colorsys
 import hashlib
+import heapq
 import json
 import math
 import os
@@ -16,8 +17,10 @@ import pygame
 
 WIDTH, HEIGHT = 1280, 800
 ROOM_SIZE = 12.0
-ORIGIN_X, ORIGIN_Y = WIDTH // 2, 280
-TILE_X, TILE_Y, LEVEL_H = 38, 17, 68
+ORIGIN_X, ORIGIN_Y = WIDTH // 2, 340
+TILE_X, TILE_Y, LEVEL_H = 38, 15, 50
+WALL_HEIGHT = 4.6
+STEP_HEIGHT = .375
 TEXT, INK = (238, 239, 224), (9, 13, 20)
 START = (2, 2, 3)
 
@@ -72,13 +75,17 @@ def half_diamond(room):
     return abs(differences[1] - differences[0]), differences, tuple(room)
 
 
-def accent_for(room, entrance):
+def diamond_rows(room, entrance):
     apex, differences, current = half_diamond(room)
     rows = ((apex,), differences, current)
     if entrance is not None:
         apex, differences, previous = half_diamond(entrance)
         rows += (previous, differences, (apex,))
-    hue = (stable_seed("prime-room-fundamentals", 1, rows) % 3600) / 3600
+    return rows
+
+
+def accent_for(room, entrance):
+    hue = (stable_seed("prime-room-fundamentals", 1, diamond_rows(room, entrance)) % 3600) / 3600
     return tuple(round(value * 255)
                  for value in colorsys.hsv_to_rgb(hue, .47, .90))
 
@@ -122,26 +129,136 @@ class Door:
     @property
     def approach(self):
         if self.wall == "NORTH":
-            return self.position, .8
+            return self.position, .5
+        if self.wall == "SOUTH":
+            return self.position, ROOM_SIZE - .5
         if self.wall == "WEST":
-            return .8, self.position
-        return ROOM_SIZE - .8, self.position
+            return .5, self.position
+        return ROOM_SIZE - .5, self.position
+
+    def __eq__(self, other):
+        return isinstance(other, Door) and vars(self) == vars(other)
 
 
-def make_doors(room):
-    choices = targets(room)
-    walls = ("NORTH", "WEST", "EAST")
-    offset = stable_seed("iso-wall-order", room) % 3
-    assignments = [walls[(index + offset) % 3] for index in range(len(choices))]
+OPPOSITE = {"NORTH": "SOUTH", "SOUTH": "NORTH", "WEST": "EAST", "EAST": "WEST"}
+# Left/right as seen while standing at the entrance, looking into the room.
+RELATIVE_WALLS = {
+    "SOUTH": ("NORTH", "WEST", "EAST"),
+    "NORTH": ("SOUTH", "EAST", "WEST"),
+    "WEST": ("EAST", "NORTH", "SOUTH"),
+    "EAST": ("WEST", "SOUTH", "NORTH"),
+}
+INWARD = {"NORTH": (0, 1), "SOUTH": (0, -1), "WEST": (1, 0), "EAST": (-1, 0)}
+
+
+def root_entrance():
+    return Door(-1, "SOUTH", 6.5, 0, None)
+
+
+def arrival_from(exit_door, previous):
+    return Door(-1, OPPOSITE[exit_door.wall], exit_door.position, exit_door.level, previous)
+
+
+def make_doors(room, door_targets=None, entrance=None, previous=None):
+    choices = targets(room) if door_targets is None else door_targets
+    entrance = entrance or root_entrance()
+    walls = RELATIVE_WALLS[entrance.wall]
+    assignments = [walls[index % 3] for index in range(len(choices))]
     totals = {wall: assignments.count(wall) for wall in walls}
     counts = {wall: 0 for wall in walls}
     result = []
     for index, (target, wall) in enumerate(zip(choices, assignments)):
         rank = counts[wall]
         counts[wall] += 1
-        position = ROOM_SIZE * (rank + 1) / (totals[wall] + 1)
-        result.append(Door(index, wall, position, rank // 4, target))
+        position = max(1.5, min(10.5, math.floor(ROOM_SIZE * (rank + 1) / (totals[wall] + 1)) + .5))
+        if wall == walls[0] and totals[wall] == 1:
+            position = entrance.position  # A single opposite portal is directly across.
+        seed = stable_seed("wayfarer-levels-v2", diamond_rows(room, previous), index)
+        level = 0 if sum(room) <= 11 else .75 * (seed % 3)
+        if rank:
+            level = max(.75, level)
+        result.append(Door(index, wall, position, level, tuple(target)))
+    # Very dense opposing stair banks can trap a low doorway between high
+    # neighbours. Deterministically lower optional raised exits until all
+    # thresholds connect. The inherited entrance height is never changed.
+    raised = [door for door in reversed(result) if door.level]
+    while True:
+        terrain = make_terrain(result + [entrance])
+        reachable = reachable_cells(entrance.approach, terrain)
+        if all(cell_of(door.approach) in reachable for door in result):
+            break
+        if not raised:
+            raise ValueError("Cannot construct reachable room")
+        raised.pop(0).level = 0
     return result
+
+
+def visit_frames(explorer):
+    """Rebuild spatial history from the saved door path, including custom origins."""
+    frames = [root_entrance()]
+    for depth, index in enumerate(explorer.path):
+        room = explorer.rooms[depth]
+        previous = explorer.rooms[depth - 1] if depth else None
+        door = make_doors(room, entrance=frames[-1], previous=previous)[index]
+        frames.append(arrival_from(door, room))
+    return frames
+
+
+def make_terrain(doors):
+    """Fixed crate stairs: each cell is walkable support, not decorative collision."""
+    heights = {}
+    for door in doors:
+        x, y = door.approach
+        dx, dy = INWARD[door.wall]
+        for step in range(round(door.level / STEP_HEIGHT)):
+            cell = (int(x + dx * step), int(y + dy * step))
+            heights[cell] = max(heights.get(cell, 0), door.level - step * STEP_HEIGHT)
+    return heights
+
+
+def cell_of(point):
+    return tuple(max(0, min(11, int(v))) for v in point)
+
+
+def walkable_neighbours(cell, terrain):
+    x, y = cell
+    for nxt in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+        if (0 <= nxt[0] < 12 and 0 <= nxt[1] < 12
+                and abs(terrain.get(nxt, 0) - terrain.get(cell, 0)) <= STEP_HEIGHT + .001):
+            yield nxt
+
+
+def reachable_cells(start, terrain):
+    visited, pending = {cell_of(start)}, [cell_of(start)]
+    while pending:
+        for nxt in walkable_neighbours(pending.pop(), terrain):
+            if nxt not in visited:
+                visited.add(nxt)
+                pending.append(nxt)
+    return visited
+
+
+def walk_route(start, goal, terrain):
+    """Shortest walk over floor/steps; never jump a cliff or pass through a crate."""
+    first, last = cell_of(start), cell_of(goal)
+    queue, costs, parents = [(0, first)], {first: 0}, {}
+    while queue:
+        _, cell = heapq.heappop(queue)
+        if cell == last:
+            cells = [cell]
+            while cell != first:
+                cell = parents[cell]
+                cells.append(cell)
+            result = [(x + .5, y + .5, terrain.get((x, y), 0))
+                      for x, y in reversed(cells)]
+            result.append((*goal, terrain.get(last, 0)))
+            return result
+        for nxt in walkable_neighbours(cell, terrain):
+            cost = costs[cell] + 1
+            if cost < costs.get(nxt, float("inf")):
+                parents[nxt], costs[nxt] = cell, cost
+                heapq.heappush(queue, (cost + abs(nxt[0] - last[0]) + abs(nxt[1] - last[1]), nxt))
+    return None
 
 
 def nearest_door(doors, x, y, distance=1.25):
@@ -197,8 +314,9 @@ def pointer_point(event, screen_size):
 def portal_polygon(door, half_width=.8, height=1.25):
     """Project the actual wall plane, shared by drawing and hit testing."""
     p, z = door.position, door.level
-    if door.wall == "NORTH":
-        ends = ((p - half_width, 0), (p + half_width, 0))
+    if door.wall in ("NORTH", "SOUTH"):
+        y = 0 if door.wall == "NORTH" else ROOM_SIZE
+        ends = ((p - half_width, y), (p + half_width, y))
     else:
         x = 0 if door.wall == "WEST" else ROOM_SIZE
         ends = ((x, p - half_width), (x, p + half_width))
@@ -214,9 +332,6 @@ def inside_polygon(point, polygon):
     return all(c >= 0 for c in crosses) or all(c <= 0 for c in crosses)
 
 
-RETURN_POINT = (11.15, 11.15)
-
-
 class Game:
     def __init__(self, explorer=None, save_path=None):
         self.explorer = explorer if explorer is not None else Explorer()
@@ -229,16 +344,24 @@ class Game:
         self.stride = 0
         self.facing = (1, 1)
         self.notice = "Tap the floor to walk. Tap a doorway to travel."
+        self.frames = visit_frames(self.explorer)
         self.load_room()
 
-    def load_room(self):
-        self.doors = make_doors(self.explorer.current)
+    def load_room(self, returning=None):
+        self.entrance_door = self.frames[-1]
+        self.doors = make_doors(self.explorer.current, entrance=self.entrance_door,
+                                previous=self.explorer.entrance)
         self.accent = accent_for(self.explorer.current, self.explorer.entrance)
-        self.x = self.y = ROOM_SIZE / 2
-        self.z = 0.0
+        self.terrain = make_terrain(self.doors + [self.entrance_door])
+        spawn = self.entrance_door if returning is None else self.doors[returning]
+        self.x, self.y = spawn.approach
+        self.z = spawn.level
+        self.facing = INWARD[spawn.wall]
         self.destination = None
+        self.route = []
         self.pending = None
         self.walking = False
+        self.notice = "Entered from %s / tap a door to travel" % spawn.wall.lower()
         self.autosave()
 
     def autosave(self):
@@ -250,43 +373,46 @@ class Game:
 
     def click(self, point):
         # Frontmost visible portals take precedence over the floor behind them.
-        for door in sorted(self.doors, key=lambda d: sum(d.approach), reverse=True):
-            rune = iso(*door.approach)
+        portals = self.doors + ([self.entrance_door] if self.explorer.path else [])
+        for door in sorted(portals, key=lambda d: sum(d.approach), reverse=True):
+            rune = iso(*door.approach, door.level)
             if (inside_polygon(point, portal_polygon(door))
                     or math.dist(point, rune) <= 24):
-                self.destination, self.pending = door.approach, door.index
-                self.notice = "Walking to door %X / P%d" % (door.index, sum(door.target))
+                self.set_destination(door.approach, "back" if door.index == -1 else door.index)
+                self.notice = ("Returning through the entrance" if door.index == -1 else
+                               "Walking to door %X / P%d" % (door.index, sum(door.target)))
                 return
-        if self.explorer.path and math.dist(point, iso(*RETURN_POINT)) < 36:
-            self.destination, self.pending = RETURN_POINT, "back"
-            self.notice = "Returning along your path"
-            return
+        # Raised top faces are pickable, using the same polygons as the renderer.
+        for cell, height in sorted(self.terrain.items(), key=lambda item: sum(item[0]), reverse=True):
+            x, y = cell
+            top = [iso(x, y, height), iso(x+1, y, height),
+                   iso(x+1, y+1, height), iso(x, y+1, height)]
+            if inside_polygon(point, top):
+                self.set_destination((x + .5, y + .5))
+                return
         x, y = unproject(point)
         if 0 <= x <= ROOM_SIZE and 0 <= y <= ROOM_SIZE:
-            self.destination = (max(.65, min(ROOM_SIZE - .65, x)),
-                                max(.65, min(ROOM_SIZE - .65, y)))
-            self.pending = None
+            self.set_destination((max(.5, min(ROOM_SIZE - .5, x)),
+                                  max(.5, min(ROOM_SIZE - .5, y))))
             self.notice = "Tap another spot to change course"
+
+    def set_destination(self, point, action=None):
+        route = walk_route((self.x, self.y), point, self.terrain)
+        if route is None:
+            self.notice = "That landing cannot be reached from here"
+            return
+        self.destination, self.pending, self.route = point, action, route
 
     def nearby(self):
         return nearest_door(self.doors, self.x, self.y)
-
-    def use(self):
-        door = self.nearby()
-        if door:
-            self.explorer.take(door.index)
-            self.load_room()
-        elif self.explorer.path and self.x + self.y > ROOM_SIZE * 1.72:
-            self.explorer.back()
-            self.load_room()
 
     def update(self, dt):
         self.time += dt
         self.walking = False
         if self.destination is None:
-            self.z = max(0, self.z - dt * 2)
             return
-        dx, dy = self.destination[0] - self.x, self.destination[1] - self.y
+        waypoint = self.route[0]
+        dx, dy = waypoint[0] - self.x, waypoint[1] - self.y
         distance = math.hypot(dx, dy)
         step = min(distance, 3.5 * dt)
         if distance > .001:
@@ -295,20 +421,22 @@ class Game:
             self.y += self.facing[1] * step
             self.stride += step * 5
             self.walking = True
+        self.z += (waypoint[2] - self.z) * (min(1, step / distance) if distance > .001 else 1)
         if distance > 3.5 * dt + .001:
-            self.z = max(0, self.z - dt * 2)
             return
-        self.x, self.y = self.destination
-        level = self.doors[self.pending].level if isinstance(self.pending, int) else 0
-        if abs(self.z - level) > .01:
-            self.z += max(-dt * 2, min(dt * 2, level - self.z))
+        self.x, self.y, self.z = waypoint
+        self.route.pop(0)
+        if self.route:
             return
         action = self.pending
         self.destination = self.pending = None
         if action == "back":
+            index = self.explorer.path[-1]
             self.explorer.back()
-            self.load_room()
+            self.frames.pop()
+            self.load_room(returning=index)
         elif isinstance(action, int):
+            self.frames.append(arrival_from(self.doors[action], self.explorer.current))
             self.explorer.take(action)
             self.load_room()
         else:
@@ -324,23 +452,36 @@ class Game:
         pygame.draw.polygon(self.canvas, blend(INK, self.accent, .6), outer)
         pygame.draw.polygon(self.canvas, blend(INK, self.accent, .06), points)
         pygame.draw.lines(self.canvas, colour, True, points, 2)
-        # A receding inner glow gives the portal depth without changing its plane.
         mid = tuple((points[2][i] + points[3][i]) // 2 for i in (0, 1))
-        self.line(blend(INK, colour, .6), (mid[0], mid[1] + 16),
-                  (mid[0], mid[1] + 50), 2)
         ax, ay = door.approach
-        rune = iso(ax, ay)
+        rune = iso(ax, ay, door.level)
         pygame.draw.circle(self.canvas, colour, rune,
                            10 + round(3 * math.sin(self.time * 3 + door.index)), 2)
-        if door.level:
-            self.line(colour, rune, iso(ax, ay, door.level), 2)
-        label = self.small.render("%X  P%d" % (door.index, sum(door.target)), True, TEXT)
+        text = ("RETURN" if self.explorer.path else "ENTRANCE") if door.index == -1 else "%X  P%d" % (door.index, sum(door.target))
+        label = self.small.render(text, True, TEXT)
         self.canvas.blit(label, (mid[0] - label.get_width() // 2, min(p[1] for p in outer) - 24))
+
+    def draw_crate(self, cell, height):
+        x, y = cell
+        seed = stable_seed("crate-grain-v2", diamond_rows(self.explorer.current, self.explorer.entrance), cell)
+        wood = (112 + seed % 25, 76 + seed % 17, 43 + seed % 11)
+        top = [iso(x,y,height), iso(x+1,y,height), iso(x+1,y+1,height), iso(x,y+1,height)]
+        faces = [([iso(x+1,y), iso(x+1,y+1), top[2], top[1]], .65),
+                 ([iso(x,y+1), iso(x+1,y+1), top[2], top[3]], .85)]
+        for face, shade in faces:
+            pygame.draw.polygon(self.canvas, blend(INK, wood, shade), face)
+            pygame.draw.lines(self.canvas, (38, 31, 27), True, face, 2)
+            self.line(blend(wood, TEXT, .15), face[0], face[2], 2)
+            self.line(blend(wood, TEXT, .15), face[1], face[3], 2)
+        pygame.draw.polygon(self.canvas, wood, top)
+        pygame.draw.lines(self.canvas, blend(wood, TEXT, .25), True, top, 1)
+        for t in (.25, .5, .75):
+            self.line(blend(INK, wood, .7), iso(x+t,y,height), iso(x+t,y+1,height))
 
     def draw_character(self):
         """Small animated cloaked explorer, drawn locally with no asset downloads."""
         px, py = iso(self.x, self.y, self.z)
-        sx, sy = iso(self.x, self.y)
+        sx, sy = iso(self.x, self.y, self.z)
         pygame.draw.ellipse(self.canvas, (12, 18, 25), (sx - 20, sy - 8, 40, 16))
         gait = math.sin(self.stride) if self.walking else 0
         bob = abs(gait) * 2
@@ -382,40 +523,41 @@ class Game:
         self.canvas.fill(blend(INK, a, .08))
         floor = [iso(0, 0), iso(ROOM_SIZE, 0), iso(ROOM_SIZE, ROOM_SIZE), iso(0, ROOM_SIZE)]
         walls = [
-            ([iso(0, 0), iso(ROOM_SIZE, 0), iso(ROOM_SIZE, 0, 3.2), iso(0, 0, 3.2)], .30),
-            ([iso(0, 0), iso(0, ROOM_SIZE), iso(0, ROOM_SIZE, 3.2), iso(0, 0, 3.2)], .22),
-            ([iso(ROOM_SIZE, 0), iso(ROOM_SIZE, ROOM_SIZE), iso(ROOM_SIZE, ROOM_SIZE, 3.2), iso(ROOM_SIZE, 0, 3.2)], .16)]
+            ([iso(0, 0), iso(ROOM_SIZE, 0), iso(ROOM_SIZE, 0, WALL_HEIGHT), iso(0, 0, WALL_HEIGHT)], .30),
+            ([iso(0, 0), iso(0, ROOM_SIZE), iso(0, ROOM_SIZE, WALL_HEIGHT), iso(0, 0, WALL_HEIGHT)], .22)]
         for points, shade in walls:
             pygame.draw.polygon(self.canvas, blend(INK, a, shade), points)
             pygame.draw.lines(self.canvas, blend(INK, a, .55), True, points, 2)
+        for z in (1.5, 3.0, 4.5):
+            self.line(blend(INK,a,.38), iso(0,0,z), iso(ROOM_SIZE,0,z))
+            self.line(blend(INK,a,.30), iso(0,0,z), iso(0,ROOM_SIZE,z))
         pygame.draw.polygon(self.canvas, blend(INK, a, .38), floor)
         for value in range(13):
             self.line(blend(INK, a, .48), iso(value, 0), iso(value, ROOM_SIZE))
             self.line(blend(INK, a, .48), iso(0, value), iso(ROOM_SIZE, value))
         if self.destination:
-            marker = iso(*self.destination)
+            marker = iso(*self.destination, self.terrain.get(cell_of(self.destination), 0))
             pygame.draw.ellipse(self.canvas, (238, 199, 126), (marker[0] - 15, marker[1] - 7, 30, 14), 2)
-            start = iso(self.x, self.y)
-            for i in range(1, 10):
-                t = i / 10
-                p = (round(start[0] + (marker[0] - start[0]) * t),
-                     round(start[1] + (marker[1] - start[1]) * t))
-                pygame.draw.circle(self.canvas, blend(INK, a, .8), p, 2)
-        # The east/front wall is cut away; its portals remain visible, like gates.
-        # Sort the explorer and portals by world depth to avoid drawing through them.
-        actors = [(sum(d.approach), d) for d in self.doors] + [(self.x + self.y, None)]
-        for _, door in sorted(actors, key=lambda item: item[0]):
-            if door is None:
+            for waypoint in self.route:
+                pygame.draw.circle(self.canvas, blend(INK, a, .8), iso(*waypoint), 2)
+        # Both front walls are cut away for visibility. They still have physical
+        # wall-plane portals; faint rims indicate where these walls stand.
+        for axy, bxy in (((12,0),(12,12)), ((0,12),(12,12))):
+            self.line(blend(INK,a,.6), iso(*axy), iso(*bxy), 2)
+            self.line(blend(INK,a,.25), iso(*axy,.25), iso(*bxy,.25))
+        actors = [(sum(d.approach), "door", d) for d in self.doors + [self.entrance_door]]
+        actors += [(sum(cell) + 1, "crate", (cell, height)) for cell, height in self.terrain.items()]
+        actors += [(self.x + self.y + .01, "player", None)]
+        # Crates support the feet: draw before player and door at equal depth.
+        for _, kind, item in sorted(actors, key=lambda item: (item[0], item[1])):
+            if kind == "player":
                 self.draw_character()
+            elif kind == "crate":
+                self.draw_crate(*item)
             else:
-                self.draw_door(door)
-        if self.explorer.path:
-            front = iso(*RETURN_POINT)
-            pygame.draw.ellipse(self.canvas, blend(TEXT, a, .65), (front[0] - 24, front[1] - 12, 48, 24), 2)
-            label = self.small.render("RETURN", True, TEXT)
-            self.canvas.blit(label, (front[0] - label.get_width() // 2, front[1] + 18))
+                self.draw_door(item)
         room = self.explorer.current
-        self.canvas.blit(self.title.render("THE BETWEEN / ISOMETRIC", True, TEXT), (28, 20))
+        self.canvas.blit(self.title.render("THE BETWEEN / THRESHOLDS", True, TEXT), (28, 20))
         info = "P%d  (%s)  visit %s" % (sum(room), ",".join(map(str, room)), self.explorer.address)
         self.canvas.blit(self.font.render(info, True, TEXT), (30, 61))
         pygame.draw.rect(self.canvas, INK, (0, 730, WIDTH, 70))

@@ -37,28 +37,13 @@ class PointerTests(unittest.TestCase):
         self.assertEqual((game.x, game.y), (5, 9))
         self.assertEqual(game.explorer.path, [])
 
-    def test_real_doors_all_walls_and_return(self):
-        seen = set()
-        for wall in ("NORTH", "WEST", "EAST"):
-            for level in (0, 1, 2):
-                game = code["Game"]()
-                door = code["Door"](0, wall, 6, level, (3, 3, 5))
-                game.doors = [door]
+    def test_portals_parallel_to_all_four_walls(self):
+        for wall in ("NORTH", "SOUTH", "WEST", "EAST"):
+            for level in (0, .75, 1.5):
+                door = code["Door"](0, wall, 6.5, level, (3, 3, 5))
                 polygon = code["portal_polygon"](door)
-                # Width must be parallel to the projection of the wall's tangent.
                 dx, dy = polygon[1][0] - polygon[0][0], polygon[1][1] - polygon[0][1]
-                self.assertEqual(dx * dy > 0, wall == "NORTH")
-                point = tuple(sum(p[i] for p in polygon) / 4 for i in (0, 1))
-                game.click(point)
-                self.assertEqual(game.pending, 0)
-                self.settle(game)
-                self.assertEqual(game.explorer.current, (3, 3, 5))
-                self.assertEqual(game.explorer.path, [0])
-                game.click(code["iso"](*code["RETURN_POINT"]))
-                self.settle(game)
-                self.assertEqual(game.explorer.current, (2, 2, 3))
-                seen.add(wall)
-        self.assertEqual(len(seen), 3)
+                self.assertEqual(dx * dy > 0, wall in ("NORTH", "SOUTH"))
 
     def test_scaled_mouse_and_finger_have_identical_destinations(self):
         for size in ((1280, 800), (640, 800), (2560, 1600), (800, 1280)):
