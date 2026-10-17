@@ -18,15 +18,43 @@ python -m pip install -r requirements-side-scroller.txt
 python isometric_game/main.py
 ```
 
-Controls: WASD or arrow keys to move, E or Enter to use a nearby exit,
-Backspace to return immediately, and Escape to save and quit.
+Click or tap the floor to walk to that spot. Click a doorway (or its glowing
+threshold) to walk there and enter automatically, including riding its lift
+when raised. Click RETURN to walk back along your path. A new floor tap changes
+course and cancels a queued door entry. Escape closes the game. The explorer
+has a hood, cloak, boots, lantern, and walking animation; there is no directional
+pad or USE button.
 
-On Android, open `main.py` in PyramIDE and use its green graphical Run arrow.
+On Android, open the single file `PrimeLabyrinth-PyramIDE.py` in PyramIDE and
+use its green graphical Run arrow. The desktop launcher loads this same file
+as its renderer, so geometry and interaction fixes reach both editions.
 The game requests PyramIDE's SDL fullscreen surface and scales the 1280x800
 logical canvas to the tablet while preserving its aspect ratio. Do not launch a
 graphical build from PyramIDE's plain terminal: that shell does not initialise
-SDL. If the graphical runner exits unexpectedly, inspect `isometric-crash.txt`
-in the repository root.
+SDL. The standalone edition stores the route in memory only, starting a fresh
+journey on each launch. The desktop launcher retains the previous JSON saves.
+If the standalone graphical runner fails inside its main loop, it attempts to
+write `/sdcard/PrimeLabyrinth-PyramIDE-error.txt`. Native crashes or import-time
+failures may not produce that log.
+
+The displayed room colour now matches the canonical diamond calculation in
+the side-scroller. Earlier standalone builds hashed the top diamond apex in a
+different shape; their colours differed, although their routes were the same.
+
+Tablet updates: in Termux, pull the repository, then overwrite just the shared
+file (not the whole folder):
+
+```bash
+git -C ~/PrimeLabyrinth pull --ff-only
+cp ~/PrimeLabyrinth/PrimeLabyrinth-PyramIDE.py ~/storage/shared/PrimeLabyrinth-PyramIDE.py
+```
+
+Close the old editor tab, reopen the shared file, and use the green Run arrow.
+
+Verification: `python -m unittest isometric_game.test_pointer -v` checks floor
+movement, retargeting, entry and return through every wall and raised level,
+mouse/touch mapping under scaling and letterboxing, synthetic touch suppression,
+canonical engine/colour agreement, and desktop save compatibility.
 
 Use a new expedition or custom origin with:
 
