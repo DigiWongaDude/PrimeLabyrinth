@@ -1,0 +1,1 @@
+"""Isometric Prime Labyrinth prototype."""

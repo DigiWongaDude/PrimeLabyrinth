@@ -2,6 +2,22 @@
 
 Explore a maze woven from prime numbers through a small collection of interactive tools and visualisers.
 
+## The Between — isometric prototype
+
+The Equinox-inspired experiment lives independently in `isometric_game/` while
+sharing the proven Prime Labyrinth engine and path-address save model. Its
+cutaway rooms have deterministic exits on the north, west and east walls;
+additional exits can occupy raised ledges reached by glowing threshold lifts.
+
+```bash
+python -m pip install -r requirements-side-scroller.txt
+python isometric_game/main.py
+```
+
+On Windows, double-click `Play-Isometric-Labyrinth.bat`. On a tablet or Linux
+machine, clone or pull the `codex/pygame-explorers` branch and run the two
+commands above. See `isometric_game/README.md` for controls and options.
+
 ## The Between — 2D platform explorer
 
 Double-click **`Play-Prime-Labyrinth.bat`** on Windows. The launcher uses a local

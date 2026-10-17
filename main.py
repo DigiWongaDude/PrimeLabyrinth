@@ -35,6 +35,7 @@ def show_menu() -> None:
     print("  2) Prime probe (engine CLI)")
     print("  3) River delta map (2D)")
     print("  4) The Between (2D platform explorer)")
+    print("  5) The Between (isometric prototype)")
     print("  Q) Quit")
 
 
@@ -77,11 +78,19 @@ def main() -> None:
             import sys
             from pathlib import Path
             subprocess.run([sys.executable, str(Path(__file__).with_name("prime_side_scroller.py"))])
+        elif choice == "5":
+            import subprocess
+            import sys
+            from pathlib import Path
+            subprocess.run([
+                sys.executable,
+                str(Path(__file__).with_name("isometric_game") / "main.py"),
+            ])
         elif choice == "q":
             print("Goodbye!")
             break
         else:
-            print("Invalid choice. Please select 1, 2, 3, 4, or Q.\n")
+            print("Invalid choice. Please select 1, 2, 3, 4, 5, or Q.\n")
 
 
 if __name__ == "__main__":
