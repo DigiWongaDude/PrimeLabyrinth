@@ -10,3 +10,4 @@ prime_labyrinth*.sqlite3*
 saves/
 *.blend1
 room-evidence/**/.deps/
+.codex-remote-attachments/

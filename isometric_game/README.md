@@ -21,6 +21,13 @@ python isometric_game/main.py
 Controls: WASD or arrow keys to move, E or Enter to use a nearby exit,
 Backspace to return immediately, and Escape to save and quit.
 
+On Android, open `main.py` in PyramIDE and use its green graphical Run arrow.
+The game requests PyramIDE's SDL fullscreen surface and scales the 1280x800
+logical canvas to the tablet while preserving its aspect ratio. Do not launch a
+graphical build from PyramIDE's plain terminal: that shell does not initialise
+SDL. If the graphical runner exits unexpectedly, inspect `isometric-crash.txt`
+in the repository root.
+
 Use a new expedition or custom origin with:
 
 ```bash

@@ -5,6 +5,7 @@ import argparse
 import math
 import os
 import sys
+import traceback
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +23,22 @@ ORIGIN_X, ORIGIN_Y = WIDTH // 2, 170
 TILE_X, TILE_Y, LEVEL_H = 42, 22, 74
 TEXT = (238, 239, 224)
 INK = (9, 13, 20)
+
+
+def is_android():
+    """PyramIDE exposes Android through its environment rather than platform."""
+    return (sys.platform == "android" or "ANDROID_ROOT" in os.environ
+            or "ANDROID_ARGUMENT" in os.environ)
+
+
+def fit_to_screen(source, destination):
+    """Letterbox the fixed logical canvas onto any phone/tablet display."""
+    sw, sh = destination.get_size()
+    scale = min(sw / WIDTH, sh / HEIGHT)
+    size = (max(1, round(WIDTH * scale)), max(1, round(HEIGHT * scale)))
+    frame = pygame.transform.smoothscale(source, size)
+    destination.fill(INK)
+    destination.blit(frame, ((sw - size[0]) // 2, (sh - size[1]) // 2))
 
 
 def blend(a, b, t):
@@ -212,7 +229,9 @@ def main():
         pygame.image.save(game.draw(), args.screenshot)
         pygame.quit()
         return
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    # PyramIDE's SDL activity supplies its surface through the (0, 0) mode.
+    # Desktop platforms retain the convenient 1280x800 window.
+    screen = pygame.display.set_mode((0, 0) if is_android() else (WIDTH, HEIGHT))
     pygame.display.set_caption("The Between — Isometric Prime Labyrinth")
     clock, running = pygame.time.Clock(), True
     while running:
@@ -232,11 +251,21 @@ def main():
         dx = keys[pygame.K_d] + keys[pygame.K_RIGHT] - keys[pygame.K_a] - keys[pygame.K_LEFT]
         dy = keys[pygame.K_s] + keys[pygame.K_DOWN] - keys[pygame.K_w] - keys[pygame.K_UP]
         game.update(dt, dx, dy)
-        screen.blit(game.draw(), (0, 0))
+        if screen.get_size() == (WIDTH, HEIGHT):
+            screen.blit(game.draw(), (0, 0))
+        else:
+            fit_to_screen(game.draw(), screen)
         pygame.display.flip()
     game.autosave()
     pygame.quit()
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except BaseException:
+        # PyramIDE may close its graphical runner immediately on failure.
+        # Preserve the traceback beside the project where Android can read it.
+        report = ROOT / "isometric-crash.txt"
+        report.write_text(traceback.format_exc(), encoding="utf-8")
+        raise
