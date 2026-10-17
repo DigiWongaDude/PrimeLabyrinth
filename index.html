@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#090d14">
+  <title>The Between — Prime Labyrinth</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="game-shell">
+    <canvas id="game" width="1280" height="800" aria-label="The Between isometric Prime Labyrinth"></canvas>
+    <header>
+      <h1>THE BETWEEN <span>/ THRESHOLDS</span></h1>
+      <p id="room-info">P7 (2,2,3) · visit 2,2,3:ROOT</p>
+    </header>
+    <section id="status" aria-live="polite">Tap the floor to walk. Tap a doorway to travel.</section>
+    <nav>
+      <button id="back" type="button" disabled>Return</button>
+      <button id="share" type="button">Copy path link</button>
+      <button id="reset" type="button">New journey</button>
+      <button id="full" type="button">Full screen</button>
+    </nav>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
