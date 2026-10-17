@@ -1,0 +1,9 @@
+{
+  "schema": "game-room.opening-schedule.v1",
+  "roomId": "prime-gate-7",
+  "primaryArrival": {"openingId": "arrival-south", "exception": ""},
+  "openings": [
+    {"id": "arrival-south", "kind": "door", "wall": "wall-south", "widthMeters": 4.0, "heightMeters": 4.5, "thresholdMeters": 0.0, "depthMeters": 5.0, "destination": "Existing neon arrival corridor and exterior apron", "mask": "masks/arrival-south.png", "cutter": "masks/arrival-south.json", "approved": false},
+    {"id": "forward-north", "kind": "door", "wall": "wall-north", "widthMeters": 4.8, "heightMeters": 5.8, "thresholdMeters": 0.0, "depthMeters": 8.0, "destination": "Prime 11 room (3,3,5) through a visible passage", "mask": "masks/forward-north.png", "cutter": "masks/forward-north.json", "approved": false}
+  ]
+}

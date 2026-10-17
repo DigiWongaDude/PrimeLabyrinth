@@ -1,0 +1,12 @@
+{
+  "schema": "game-room.plan-metadata.v1",
+  "roomId": "prime-gate-7",
+  "style": "monochrome-engineering",
+  "projectionSource": "actual-meshes",
+  "layers": ["lower-room", "reflected-ceiling"],
+  "semanticLabelsOutsideImage": true,
+  "aiInspirationIncluded": false,
+  "aiInspirationReason": "",
+  "coverage": ["room-outline", "cutouts", "openings", "exterior-apron", "main-sign", "ingress-props", "floor-markers", "barriers", "columns", "circulation", "placed-features"],
+  "coverageNotes": {"columns": "No freestanding columns are declared; wall ribs are engaged pilasters and remain part of the wall system.", "main-sign": "The main sign is a procedural header plaque above the south arrival and contains no AI-rendered text.", "projectionMethod": "The plan and elevation images are deterministic orthographic projections of the vertices in plans/function-concept-mesh.json, including chamfered opening geometry and non-rectangular prop silhouettes."}
+}

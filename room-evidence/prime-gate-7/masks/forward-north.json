@@ -1,0 +1,47 @@
+{
+  "schema": "game-room.opening-cutter.v1",
+  "id": "forward-north",
+  "kind": "door",
+  "widthMeters": 4.8,
+  "heightMeters": 5.8,
+  "sillMeters": null,
+  "depthMeters": 8.0,
+  "source": "forward-north.png",
+  "sourceSha256": "4b1cec6c1b0d6be2886579a01293a4a275d6a1f5493a9788f8497e43bbf9eea1",
+  "imageSize": [
+    256,
+    256
+  ],
+  "whitePixelRatio": 0.88809204,
+  "contours": [
+    {
+      "role": "outer",
+      "points": [
+        [
+          0.0,
+          0.772549
+        ],
+        [
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.772549
+        ],
+        [
+          0.8666667,
+          0.9058824
+        ],
+        [
+          0.1333333,
+          0.9058824
+        ]
+      ]
+    }
+  ]
+}

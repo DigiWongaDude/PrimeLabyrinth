@@ -1,0 +1,22 @@
+{
+  "database_integrity": "ok",
+  "status": "completed",
+  "database_prime_ceiling": 10000,
+  "unique_configurations": 212465,
+  "connections": 366400,
+  "open_connections": 366400,
+  "forward_moves": 366400,
+  "backward_moves": 366400,
+  "repeated_configuration_expansions_avoided": 153936,
+  "explicit_reverse_connections": 0,
+  "stack_backtracking_enabled": true,
+  "validation_errors": [],
+  "validated": true,
+  "nine_key_definition": "previous/current/next prime for each of three additives",
+  "target_prime": 5449,
+  "first_arrival_path_rooms": 718,
+  "first_arrival_path_transitions": 717,
+  "moves_before_first_arrival": 351359,
+  "path_transition_errors": [],
+  "path_validated": true
+}

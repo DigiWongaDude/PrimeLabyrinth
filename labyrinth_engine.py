@@ -22,7 +22,7 @@ def primes_up_to(n: int):
         p += 1
     return [i for i in range(n + 1) if sieve[i]]
 
-MAX_N = 2000
+MAX_N = 10000
 PRIMES = primes_up_to(MAX_N)
 PRIME_SET = set(PRIMES)
 PRIME_INDEX = {p: i for i, p in enumerate(PRIMES)}

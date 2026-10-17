@@ -1,0 +1,7 @@
+{
+  "schema": "game-room.milestone-reviews.v1",
+  "roomId": "prime-gate-7",
+  "function": {"status": "pending", "approvedBy": "", "approvedAt": "", "evidence": ["plans/floor-plan.png", "plans/reflected-ceiling-plan.png", "plans/wall-elevation-north.png", "images/visual-target.png", "images/prop-reference-contact-sheet.png", "masks/opening-contact-sheet.png"], "strangestElement": "The seven-spoke crown promises that the room's prime identity is structural rather than a decorative numeral; the paired pylons and single true forward gate must make that promise legible without inventing extra routes.", "notes": "Awaiting explicit human approval of the layout, both prop references, and both opening masks."},
+  "form": {"status": "pending", "approvedBy": "", "approvedAt": "", "evidence": [], "strangestElement": "Pending Function approval.", "notes": ""},
+  "runtime": {"status": "pending", "approvedBy": "", "approvedAt": "", "evidence": [], "strangestElement": "Pending Form approval.", "notes": ""}
+}

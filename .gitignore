@@ -1,5 +1,12 @@
 node_modules
+__pycache__/
+*.py[cod]
 .DS_Store
 dist
 npm-debug.log*
 .vscode/
+prime_labyrinth*.sqlite3*
+.venv/
+saves/
+*.blend1
+room-evidence/**/.deps/

@@ -1,0 +1,49 @@
+{
+  "escaped": true,
+  "frontier_prime": 5449,
+  "reached_prime": 5471,
+  "seed_visits": 20,
+  "visit_states_examined": 322,
+  "starting_visit": {
+    "room": "1231,1877,2341",
+    "entrance": "1229,1873,2341"
+  },
+  "backroom_route": [
+    {
+      "token": "-1",
+      "source_prime": 5449,
+      "source_room": "1231,1877,2341",
+      "target_prime": 5443,
+      "target_room": "1231,1873,2339"
+    },
+    {
+      "token": "-3",
+      "source_prime": 5443,
+      "source_room": "1231,1873,2339",
+      "target_prime": 5441,
+      "target_room": "1231,1877,2333"
+    },
+    {
+      "token": "1",
+      "source_prime": 5441,
+      "source_room": "1231,1877,2333",
+      "target_prime": 5443,
+      "target_room": "1231,1879,2333"
+    },
+    {
+      "token": "1",
+      "source_prime": 5443,
+      "source_room": "1231,1879,2333",
+      "target_prime": 5449,
+      "target_room": "1237,1879,2333"
+    },
+    {
+      "token": "0",
+      "source_prime": 5449,
+      "source_room": "1237,1879,2333",
+      "target_prime": 5471,
+      "target_room": "1249,1889,2333"
+    }
+  ],
+  "route_code_suffix": "-1-3110"
+}

@@ -1,0 +1,46 @@
+{
+  "schema": "game-room.prop-manifest.v1",
+  "roomId": "prime-gate-7",
+  "generation": {
+    "provider": "meshy",
+    "apiModel": "meshy-5",
+    "pricingSource": "https://docs.meshy.ai/en/api/pricing",
+    "pricingVerifiedAt": "2026-10-02T03:05:52Z",
+    "creditsPerTexturedTask": 30,
+    "hardCreditCeiling": 120,
+    "maxChargedAttemptsPerAsset": 2,
+    "pricingNote": "Official pricing checked 2026-10-02: current standard Image-to-3D with 2K textures is 30 credits. The current API reference no longer lists meshy-5, so no paid submission is permitted until the model-contract mismatch is resolved explicitly."
+  },
+  "assets": [
+    {
+      "id": "route-pylon",
+      "function": "A paired navigation beacon that frames the hero gate while remaining outside the movement envelope.",
+      "description": "Stable floor-mounted tapered gunmetal pylon with planted hexagonal base, cyan vertical guidance channels, and a restrained violet accent.",
+      "class": "reusable",
+      "dimensionsMeters": [0.8, 0.8, 1.8],
+      "attachmentFace": "floor",
+      "semanticFront": "negative-y",
+      "intendedInstances": 2,
+      "targetPolycount": 18000,
+      "requiredClearanceMeters": 0.35,
+      "rejectionCriteria": ["The base is incomplete, floats, or cannot sit flush on a level floor.", "The back surface is missing or fused into the background.", "Any illuminated or armour component is detached or impossibly supported.", "The silhouette is materially wider than the declared 0.8 m footprint after normalization."],
+      "image": {"source": "images/route-pylon.png", "generator": "OpenAI built-in image generation", "prompt": "A single isolated, full, uncropped, floor-mounted sci-fi route pylon: 1.8 m tall, planted hexagonal base, tapered dark gunmetal body, recessed cyan light channels, one restrained violet accent, robust connected construction, complete back and sides, neutral three-quarter view, even studio light, transparent background; no room, people, text, watermark, crop, floating parts, or fused background.", "approved": false, "approvedBy": ""},
+      "attempts": []
+    },
+    {
+      "id": "prime-crown",
+      "function": "The unique gate identifier that communicates seven through form while preserving the portal opening and hero silhouette.",
+      "description": "Shallow wall-mounted mechanical crown with exactly seven connected radial fins, a solid central hub, cyan seams, violet core, and a broad rear mounting plate.",
+      "class": "hero",
+      "dimensionsMeters": [2.8, 0.35, 1.5],
+      "attachmentFace": "wall",
+      "semanticFront": "negative-y",
+      "intendedInstances": 1,
+      "targetPolycount": 24000,
+      "requiredClearanceMeters": 0.1,
+      "rejectionCriteria": ["The object does not contain exactly seven dominant radial fins.", "The rear mounting face is missing, strongly curved, or cannot sit flush to the wall.", "The back surface is missing or fused into the background.", "Any fin, light strip, hub component, or bracket is detached or impossibly supported.", "The generated asset includes text, numerals, or an open portal cavity."],
+      "image": {"source": "images/prime-crown.png", "generator": "OpenAI built-in image generation", "prompt": "A single isolated shallow wall-mounted sci-fi gate crown: exactly seven broad connected radial fins around a solid hub, dark gunmetal layered plates, cyan recessed seams, restrained violet core, believable rear mounting plate and brackets, complete uncropped silhouette, neutral three-quarter front view, transparent background; no doorway, room, people, text, numbers, watermark, crop, floating parts, or fused background.", "approved": false, "approvedBy": ""},
+      "attempts": []
+    }
+  ]
+}

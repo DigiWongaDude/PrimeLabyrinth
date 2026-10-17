@@ -1,0 +1,47 @@
+{
+  "schema": "game-room.opening-cutter.v1",
+  "id": "arrival-south",
+  "kind": "door",
+  "widthMeters": 4.0,
+  "heightMeters": 4.5,
+  "sillMeters": null,
+  "depthMeters": 5.0,
+  "source": "arrival-south.png",
+  "sourceSha256": "6c1b6c67515832397fead4a6d164babc17cb0b12158b5d14b4e68ca75d56a993",
+  "imageSize": [
+    256,
+    256
+  ],
+  "whitePixelRatio": 0.87988281,
+  "contours": [
+    {
+      "role": "outer",
+      "points": [
+        [
+          0.0,
+          0.7960784
+        ],
+        [
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.7960784
+        ],
+        [
+          0.8901961,
+          0.8901961
+        ],
+        [
+          0.1098039,
+          0.8901961
+        ]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "schema": "game-room.room-brief.v1",
+  "roomId": "prime-gate-7",
+  "family": "gameplay-room",
+  "purpose": "Introduce the Prime Labyrinth at P7 as a readable traversal chamber with one true forward route to P11 (3,3,5), one clear return route, and an unobstructed first-person movement lane.",
+  "runtimeSurface": "Blender 4.3 authored source with a later Three.js/WebGL runtime export at 1280x720.",
+  "boundsMeters": [16.0, 20.0, 8.0],
+  "hero": {"id": "forward-gate-p11", "role": "The only forward gameplay destination; a real Boolean opening with threshold, wall reveal, and at least 8 m of visible passage depth.", "reservedBoundsMeters": [7.0, 5.0, 7.0]},
+  "symmetry": {"mode": "bilateral", "order": 2, "appliesTo": ["architecture", "barriers", "circulation", "repeatedProps"], "exceptions": ["The forward gate uses a seven-spoke crown whose odd radial motif is centered on, and does not displace, the bilateral room axis."]},
+  "circulation": {"description": "A straight 4.0 m-wide route runs north-south between the 4.0 m arrival aperture and the 4.8 m forward gate. The paired pylons sit outside this lane, leaving side recovery zones and an unobstructed stopping envelope.", "minimumClearanceMeters": 4.0},
+  "productionCamera": {"viewport": [1280, 720], "location": [0.0, -8.2, 1.65], "target": [0.0, 9.4, 3.0], "verticalFovDegrees": 58.0},
+  "performanceBudget": {"maxSceneTriangles": 350000, "maxVLowBytes": 20971520, "maxHighTextureBytes": 134217728},
+  "creditBudget": {"maximumCredits": 120, "approvalRequired": true},
+  "environment": {"type": "none", "identity": "", "source": "", "assignmentKey": ""},
+  "artifacts": {"floorPlan": "plans/floor-plan.png", "reflectedCeilingPlan": "plans/reflected-ceiling-plan.png", "planMetadata": "plan-metadata.json", "wallElevations": ["plans/wall-elevation-north.png"], "visualTarget": "images/visual-target.png", "openingContactSheet": "masks/opening-contact-sheet.png"}
+}

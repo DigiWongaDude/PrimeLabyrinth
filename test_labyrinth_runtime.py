@@ -38,7 +38,10 @@ class RuntimeTests(unittest.TestCase):
             row,nxt = le.build_row(p)
             for h,doors in row:
                 self.assertEqual(s.targets((p,h)), [(nxt,d) for d in doors])
-        self.assertEqual(s.targets((1999,(3,3,1993))), [])
+        self.assertEqual(
+            s.targets((1999, (3, 3, 1993))),
+            [(2003, (3, 3, 1997)), (2003, (5, 5, 1993))],
+        )
 
     def test_invalid_door_and_lobby_reverse(self):
         s = LabyrinthSession()
