@@ -83,7 +83,8 @@ export function makeTerrain(doors) {
 }
 
 const DOOR_PATTERNS=[[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]];
-export function visitSeed(room,previous,path,generation=2){return stableSeed(`visit-architecture-v${generation}`,diamondRows(room,previous),encodePath(path));}
+// G4 changes the camera and cutaways, preserving G3 room identities for comparison.
+export function visitSeed(room,previous,path,generation=2){return stableSeed(`visit-architecture-v${generation===4?3:generation}`,diamondRows(room,previous),encodePath(path));}
 const SHAPES=["rectangle","l-shape","octagon","cross","courtyard"];
 export function roomArchitecture(room,previous,path,generation=1,entrance=rootEntrance()){
   const seed=visitSeed(room,previous,path,generation),shape=generation<3?"rectangle":SHAPES[Number(seed%BigInt(SHAPES.length))],rotation=generation<3?0:Number((seed>>8n)%4n),cells=new Set();
@@ -94,7 +95,7 @@ export function roomArchitecture(room,previous,path,generation=1,entrance=rootEn
 }
 export function doorPattern(room,previous,path,block=0,generation=2){
   if(generation<2)return DOOR_PATTERNS[0];
-  const choice=stableSeed(`door-distribution-v${generation}`,diamondRows(room,previous),encodePath(path),block)%BigInt(DOOR_PATTERNS.length);
+  const choice=stableSeed(`door-distribution-v${generation===4?3:generation}`,diamondRows(room,previous),encodePath(path),block)%BigInt(DOOR_PATTERNS.length);
   return DOOR_PATTERNS[Number(choice)];
 }
 function neighbours(cell, terrain, valid=null) { const [x,y]=cell,h=terrain.get(key(x,y))||0; return [[x-1,y],[x+1,y],[x,y-1],[x,y+1]].filter(([a,b])=>a>=0&&a<12&&b>=0&&b<12&&(!valid||valid.has(key(a,b)))&&Math.abs((terrain.get(key(a,b))||0)-h)<=STEP_HEIGHT+.001); }

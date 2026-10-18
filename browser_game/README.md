@@ -21,6 +21,10 @@ The **New journey** drop-up switches between preserved generator editions:
   each block of opposite/left/right door placements.
 - Generator 3 adds deterministic rectangle, L, octagon, cross and courtyard
   floor plans, including a path-derived orientation.
+- Generator 4 keeps G3's layouts and adds quarter-turn camera buttons. Internal
+  and front walls are low cutaway sills; only the outside rear walls remain tall.
+  Tap coordinates, character facing, crate faces and depth ordering follow the
+  camera. Rotation does not change the path ID, room layout or destination.
 
 Door targets remain in canonical nine-key order. Shared links include the
 generator number, so an earlier visit never changes after a later update.
@@ -28,7 +32,7 @@ generator number, so an earlier visit never changes after a later update.
 Verification:
 
 ```powershell
-node --test browser_game/test-engine.mjs
+node --test browser_game/test-engine.mjs browser_game/test-view.mjs
 ```
 
 The edition is deliberately static: it has no server, account or package
