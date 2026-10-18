@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { applyD1Migrations } from 'cloudflare:test';
 import { beforeAll, expect, test } from 'vitest';
 import worker from './worker';
+import { JourneyClient, JOURNEY_KEY } from '../journey-client.js';
 
 beforeAll(async()=>{await applyD1Migrations(env.DB,env.TEST_MIGRATIONS)});
 let address=0;
@@ -88,4 +89,59 @@ test('bounded request bodies and closed registration',async()=>{
   expect((await call(t,'travellers',{padding:'a'.repeat(3000)})).status).toBe(413);
   const request=new Request('http://api/v1/travellers',{method:'POST',headers:{Origin:'http://localhost:4175',Authorization:`Bearer ${t.token}`,'Content-Type':'application/json'},body:'{}'});
   expect((await worker.fetch(request,{...env,REGISTRATION_ENABLED:'false'})).status).toBe(403);
+});
+
+function memory(){const entries=new Map();return {getItem:k=>entries.get(k)||null,setItem:(k,v)=>entries.set(k,v)}}
+function transport(ip,loseResponse=()=>false){return async(url,options)=>{
+  const response=await worker.fetch(new Request(url,{...options,headers:{...options.headers,Origin:'http://localhost:4175','CF-Connecting-IP':ip}}),env);
+  if(loseResponse(url))throw new TypeError('Simulated network loss after commit');
+  return response;
+}}
+test('real client resumes with exported credential in a separate browser storage',async()=>{
+  const store=memory(),client=new JourneyClient('http://api',store,transport(traveller().ip));
+  await client.connect();await client.move(0);await client.move(1);
+  const otherStore=memory(),other=new JourneyClient('http://api',otherStore,transport(traveller().ip));
+  const result=await other.connect(client.record.token);
+  expect(result.snapshot).toEqual(client.snapshot);
+  await other.move('back');
+  expect((await other.history()).visits).toHaveLength(3);
+  expect((await client.connect()).snapshot.activePath).toBe('0');
+  expect(store.getItem('prime-labyrinth-browser-v2')).toBeNull();
+});
+test('client persists pending command across reload and resolves lost response once',async()=>{
+  const store=memory(),ip=traveller().ip;let lose=false;
+  const client=new JourneyClient('http://api',store,transport(ip,url=>lose&&url.endsWith('/advance')));
+  await client.connect();lose=true;
+  await expect(client.move(0)).rejects.toThrow('network loss');
+  const pending=JSON.parse(store.getItem(JOURNEY_KEY)).pending;
+  expect(pending.body.expectedRevision).toBe(0);
+  expect(client.snapshot.activePath).toBe('ROOT');
+  const reloaded=new JourneyClient('http://api',store,transport(ip));
+  expect((await reloaded.connect()).snapshot).toMatchObject({activePath:'0',revision:1,historyCount:2});
+  expect(reloaded.record.pending).toBeNull();
+});
+test('client stale session refreshes state instead of silently applying a second move',async()=>{
+  const first=new JourneyClient('http://api',memory(),transport(traveller().ip));await first.connect();
+  const second=new JourneyClient('http://api',memory(),transport(traveller().ip));await second.connect(first.record.token);
+  await first.move(0);
+  const result=await second.move(0);
+  expect(result.conflict).toBe(true);expect(result.snapshot.revision).toBe(1);expect(result.snapshot.activePath).toBe('0');
+});
+test('bad recovery code does not poison local storage',async()=>{
+  const store=memory(),client=new JourneyClient('http://api',store,transport(traveller().ip));
+  await expect(client.connect(traveller().token)).rejects.toThrow('unknown_credential');
+  expect(store.getItem(JOURNEY_KEY)).toBeNull();expect(client.record).toBeNull();
+});
+
+test('a failed database write rolls back discovery, ledger and active string together',async()=>{
+  const t=traveller(),created=await call(t,'travellers',{}),id=created.data.travellerId;
+  // Generated test UUID only; production SQL always uses bound input.
+  await env.DB.exec(`CREATE TRIGGER test_failure AFTER INSERT ON visits WHEN NEW.traveller_id='${id}' AND NEW.path='0' BEGIN SELECT RAISE(ABORT,'simulated_failure'); END;`);
+  const cmd={requestId:crypto.randomUUID(),expectedRevision:0,door:0};
+  try{
+    expect((await call(t,'advance',cmd)).status).toBe(503);
+    expect((await call(t,'journey')).data).toMatchObject({revision:0,activePath:'ROOT',historyCount:1});
+    expect(await env.DB.prepare('SELECT count(*) FROM commands WHERE traveller_id=?').bind(id).first('count(*)')).toBe(0);
+  }finally{await env.DB.exec('DROP TRIGGER test_failure');}
+  expect((await call(t,'advance',cmd)).status).toBe(200);
 });

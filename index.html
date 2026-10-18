@@ -30,11 +30,26 @@
           <button type="button" role="menuitem" data-generation="2">Generation 2 · Path architecture</button>
           <button type="button" role="menuitem" data-generation="3">Generation 3 · Room shapes</button>
           <button type="button" role="menuitem" data-generation="4">Generation 4 · Cutaway + rotation</button>
+          <button type="button" role="menuitem" data-generation="5">Generation 5 · Saved journey (beta)</button>
         </div>
       </div>
       <button id="full" type="button">Full screen</button>
     </nav>
   </main>
+  <dialog id="journey-dialog" aria-labelledby="journey-title">
+    <h2 id="journey-title">G5 · Your ball of string</h2>
+    <p>Permanent discoveries, a saved route, and the same G4 room geometry.</p>
+    <p id="journey-message" role="status">Connect to create or resume a traveller.</p>
+    <label for="recovery-code">Private recovery code (only to resume on another browser)</label>
+    <input id="recovery-code" type="password" autocomplete="off" spellcheck="false" maxlength="64">
+    <p>Keep this code private: anyone holding it can move your traveller. A public path link never includes it.</p>
+    <div class="journey-actions">
+      <button id="journey-connect" type="button">Connect / retry</button>
+      <button id="journey-export" type="button">Copy recovery code</button>
+      <button id="journey-close" type="button">Close</button>
+    </div>
+  </dialog>
+  <button id="journey-manage" type="button" hidden>Saved journey</button>
   <script type="module" src="app.js"></script>
 </body>
 </html>
