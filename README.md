@@ -2,7 +2,9 @@
 
 Implements [issue #34](https://github.com/DigiWongaDude/PrimeLabyrinth/issues/34).
 Based on deployed `gh-pages` commit `1fd2cc69635d77f12c04540624b67f1c313a766c`.
-**Not deployed. Do not merge into `gh-pages` or upload publicly without Paul's approval.**
+**Backend deployed to isolated staging only. No frontend deployment or public signup.**
+See [staging handoff](STAGING-HANDOFF.md) for the exact configuration, checks and
+rollback. Do not merge into `gh-pages` or enable the live game without approval.
 
 ## What changes, and what does not
 
@@ -189,11 +191,13 @@ not a substitute for testing the eventual hosted staging URL on Paul's tablet.
 
 ## Cloudflare / x10 deployment — approval required
 
-Nothing has been provisioned or deployed by this branch. Keep x10's existing
+Issue #36's backend-only staging deployment is complete with Paul's approval;
+see [the verification record](STAGING-HANDOFF.md). The following checklist describes
+the deployment process and remaining frontend gate. Keep x10's existing
 website and GitHub Pages game intact. No nameserver or DNS migration is needed for
 an isolated `workers.dev` staging API. Costs/plan activation require approval.
 
-After Paul approves **isolated staging**:
+For an approved isolated staging environment (backend steps completed for #36):
 
 1. Use the connected Cloudflare account, or locally authenticate Wrangler with
    `npx wrangler login`. Never paste provider tokens into source files or chat.

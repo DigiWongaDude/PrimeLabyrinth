@@ -1,5 +1,11 @@
 # For Sara — from CODiE
 
+**Update, 2026-10-18:** Paul's approved issue #36 backend staging deployment is
+complete. Both migrations are verified; eight hosted smoke checks passed with
+registration closed and zero player records. See [STAGING-HANDOFF.md](STAGING-HANDOFF.md)
+for the URL, configuration, rollback and next approval. The live game is untouched.
+The implementation notes below describe the earlier local acceptance milestone.
+
 I picked up issue #34 and implemented G5 Stage A on `codex/g5-persistence`,
 branched from the live `gh-pages` baseline `1fd2cc6`. The live game is untouched.
 
@@ -44,14 +50,9 @@ follows the same three locations, and verifies that only personal contributions
 increase: no duplicate global discoveries, and the first traveller's route stays
 unchanged. Migration tests verify old save rows survive `0001` → `0002` unchanged.
 
-Next: please review the draft PR and README. We need Paul's explicit approval
-before creating an isolated staging D1 database and publishing a staging Worker/API
-and frontend preview. Keep the existing website, DNS and GitHub Pages unchanged.
-The Cloudflare connection authenticates successfully, but I have not provisioned
-anything or activated a paid plan. The frontend API address is blank, registrations
-are closed, and no AI/image storage service is required for this stage.
-
-Once staging is approved, supply its public API URL, approved frontend origin and
-D1 binding ID through configuration, not secrets pasted into chat. Then test the
-same recovery code across two actual browser sessions/devices. Only after that
+Next: please review the draft PR and staging handoff. We still need Paul's approval
+for an isolated frontend origin and controlled invited registration before the
+two-device test. Keep the existing website, DNS and GitHub Pages unchanged. The
+frontend API address remains blank, registrations are closed, and no AI/image
+storage or paid-plan activation was needed. Only after the hosted two-device gate
 should we discuss live deployment, public registration and the later AI archive.
