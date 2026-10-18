@@ -18,7 +18,14 @@
     <nav>
       <button id="back" type="button" disabled>Return</button>
       <button id="share" type="button">Copy path link</button>
-      <button id="reset" type="button">New journey</button>
+      <div class="generation-picker">
+        <button id="generation-toggle" type="button" aria-haspopup="menu">New journey ▴</button>
+        <div id="generation-menu" class="generation-menu" role="menu" hidden>
+          <button type="button" role="menuitem" data-generation="1">Generation 1 · Original</button>
+          <button type="button" role="menuitem" data-generation="2">Generation 2 · Path architecture</button>
+          <button type="button" role="menuitem" data-generation="3">Generation 3 · Room shapes</button>
+        </div>
+      </div>
       <button id="full" type="button">Full screen</button>
     </nav>
   </main>
