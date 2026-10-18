@@ -132,6 +132,31 @@ async function command(db: DB, traveller: Traveller, data: Record<string, unknow
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    // Presentation-only entrance: API origin checks below remain unchanged.
+    if (request.method === 'GET' && new URL(request.url).pathname === '/') {
+      const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>THE BETWEEN — Access Denied</title>
+<style>
+html, body { margin: 0; min-height: 100%; background: #080b09; }
+body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+img { display: block; width: 100%; max-width: 900px; height: auto; }
+</style>
+</head>
+<body>
+<img src="https://digiwongadude.com/between/assets/minotaur-access-denied.png" alt="THE BETWEEN — ACCESS DENIED. This entrance is not yet open to the public. Please use the official game client.">
+</body>
+</html>`;
+      return new Response(html, { status: 200, headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'none'; img-src https://digiwongadude.com; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"
+      } });
+    }
     const origin = request.headers.get('Origin') || '';
     const allowed = env.ALLOWED_ORIGINS.split(',').map(x=>x.trim()).includes(origin) && origin !== '';
     const headers: Record<string,string> = { 'Cache-Control':'no-store', 'Vary':'Origin', 'X-Content-Type-Options':'nosniff' };
