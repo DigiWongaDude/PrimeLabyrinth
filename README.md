@@ -6,20 +6,22 @@ Based on deployed `gh-pages` commit `1fd2cc69635d77f12c04540624b67f1c313a766c`.
 
 ## What changes, and what does not
 
-G5 adds a private saved traveller and permanent historical visits. It uses G4's
+G5 adds a private saved traveller, permanent personal history and a shared
+exploration archive contributed to by every connected G5 traveller. It uses G4's
 geometry, movement, doors and camera. `engine.js` and `view.js` are unchanged.
 G1–G4 retain their existing behaviour and localStorage keys. The default is G4.
 The G5 API address is empty by default, and new server registrations are disabled.
 
-No AI generation, archive, voice, ladders, world placement or overwrites are
+No AI generation, image archive, voice, ladders, world placement or overwrites are
 implemented here. This is the persistence prerequisite, not the earlier AI
 archive project's completed Stage B. There are no backrooms or negative doors.
 
-## Three separate models
+## Four separate models
 
 | Model | Storage / identity | Behaviour |
 | --- | --- | --- |
 | Historical visits | `visits`, `(traveller_id, canonical_path)` | Immutable; revisiting the same path reuses its record |
+| Shared exploration | `discoveries`, `(generation, root_triple, path)` | One global record across all travellers; immutable first attribution |
 | Active ball of string | `travellers.active_path` and revision | Forward pushes a canonical door; retracing pops |
 | Constructed world | Reserved `world_occupancy` table | Unused; no spatial/lifecycle rules assumed |
 
@@ -30,6 +32,44 @@ Server-created parent paths and immutable additive triples establish every
 prefix of the active string. Same triple on `001` and `011` is two visits.
 Timestamps belong to first discovery of that traveller/path and never reset.
 
+### One labyrinth, everyone's exploration
+
+Two travellers reaching `g5:2,2,3:001` contribute two personal visits to **one**
+global location. Paths `001` and `011` reach the same mathematical triple but are
+**two** global locations. Shared identity never includes a traveller ID. Distinct
+prime-triple counts deduplicate triples separately from path-location counts.
+
+Migration `0002_shared_exploration.sql` backfills existing saved visits without
+changing them, then inserts shared discoveries inside the same transaction as
+each new personal visit (including ROOT). Failed transactions contribute nothing.
+Retrying, retracing or revisiting does not create another contribution for the
+same traveller/path. Counts are SQL queries over stored rows, not mutable counters.
+
+The first **successfully committed** visit owns a mapped discovery, regardless of
+who first sent a request or received a response. Later arrivals never replace its
+owner or timestamp. Historical backfill picks the earliest saved timestamp; if
+timestamps tie, lexical traveller ID breaks the tie deterministically. This is
+not proof of arrival order for old tied records. Attribution is shown only as
+"you first mapped" versus "another traveller"; public statistics omit owner IDs.
+
+The public read API exposes totals and ten recent first discoveries (canonical
+path, triple and first timestamp). Personal timelines, active routes, credentials
+and traveller IDs remain private. Paths themselves are part of the shared map,
+not secret. Contributors count anonymous traveller credentials, **not verified
+human beings**. Contributions count distinct traveller/path pairs, not footsteps.
+G5's Saved journey dialog distinguishes personal history from shared counts;
+counts reflect the last server sync, not a live subscription.
+
+G1–G4 remain local and do not silently upload old histories. Every connected G5
+traveller contributes automatically; this does not claim that every legacy/offline
+player has already been recorded. The server alone validates new doors/paths.
+No API accepts arbitrary discoveries, triples or first-discoverer claims.
+
+These are mapped locations, **not completed AI images**. Future image records
+must independently key `(edition ID, complete canonical path, renderer version)`.
+The image-generation reservation/completion workflow and image-discovery ownership
+remain later work; current mapped-discovery attribution must not masquerade as it.
+
 The HUD's **World floor: not assigned** is deliberately separate from doorway
 `level`, which remains the elevation inside a room. The world table has no
 uniqueness/collision/overwrite rules pending the next design decision.
@@ -39,7 +79,7 @@ uniqueness/collision/overwrite rules pending the next design decision.
 - Browser creates a 256-bit recovery credential using Web Crypto **before** a
   create request. Only its SHA-256 hash is stored in D1. No Cloudflare credentials
   are ever needed by browser code.
-- Every route authenticates with `Authorization: Bearer <credential>`. No caller
+- Every personal route authenticates with `Authorization: Bearer <credential>`. No caller
   can select an arbitrary traveller ID. CORS uses an explicit origin allowlist.
 - Keep recovery codes private. They are password-equivalent, stored in the G5-only
   browser localStorage record, and copied only by the recovery button. They never
@@ -48,7 +88,8 @@ uniqueness/collision/overwrite rules pending the next design decision.
   access. Protect the frontend against XSS and use HTTPS. Authentication and
   account recovery will need further work before a broad public release.
 - A move supplies a UUID request ID and expected revision. A database constraint
-  and trigger atomically record the command, insert the visit if new, and update
+  and triggers atomically record the command, insert the personal visit and shared
+  discovery if new, and update
   the active path. Stale concurrent requests fail without partial writes.
 - Repeating a request ID with the same payload returns its original acknowledgement;
   reusing it for a different payload fails. After acknowledgement the client
@@ -65,15 +106,16 @@ uniqueness/collision/overwrite rules pending the next design decision.
 
 ## API
 
-All requests need an allowed `Origin`. All except health and preflight need the
+All requests need an allowed `Origin`. All except health, exploration and preflight need the
 bearer credential. POST requires `Content-Type: application/json` and rejects
 unknown fields. Responses are `Cache-Control: no-store`.
 
 | Route | Body / result |
 | --- | --- |
 | `GET /v1/health` | API availability only |
+| `GET /v1/exploration` | Public derived `totalLocations`, `uniqueTriples`, `contributors`, `contributions` and up to ten `recentDiscoveries`; no credentials needed |
 | `POST /v1/travellers` | `{}`; idempotently creates/resumes the supplied credential |
-| `GET /v1/journey` | Current path, ordered prefix string, visit, revision and history count |
+| `GET /v1/journey` | Current path, ordered prefix string, visit, revision, private history count, shared current-location attribution and global location/triple counts |
 | `GET /v1/history?after=…` | Up to 100 historical visits; `next` cursor or null |
 | `POST /v1/advance` | `{requestId, expectedRevision, door}` |
 | `POST /v1/retrace` | `{requestId, expectedRevision}` |
@@ -123,7 +165,9 @@ npx wrangler d1 execute between-g5 --local --command "SELECT path,a,b,c,discover
 Expected: travel ROOT → 0 → 00, resume in second context, retrace to 0; all three
 visit records remain. The generated test credential is never printed. Local D1
 persists under `.wrangler/state` (ignored by Git). Tests use isolated local storage,
-not the Cloudflare account. Running `smoke:local` again adds a new local traveller.
+not the Cloudflare account. The smoke test also creates a second, DIFFERENT
+traveller and repeats that path: three new personal contributions, no duplicate
+global locations, unchanged original journey. Each run adds two local travellers.
 
 Manual browser acceptance before approval:
 
@@ -134,6 +178,11 @@ Manual browser acceptance before approval:
 5. Disconnect network, try a doorway, and reconnect with **Connect / retry**.
 6. In two browser profiles try simultaneous moves; one must refresh on conflict.
 7. Recheck G1–G4 saved paths, return landings, rotation and default G4 selection.
+8. Create a DIFFERENT traveller in a third browser profile. Follow the same path:
+   personal histories are separate, global locations do not duplicate, and the
+   original discoverer keeps attribution. Reach a new branch and confirm global
+   counts update when the first traveller reconnects. Inspect `/v1/exploration`
+   with the allowed Origin and verify no traveller IDs or credentials are exposed.
 
 Automated checks cover these state transitions and actual app handlers. They are
 not a substitute for testing the eventual hosted staging URL on Paul's tablet.
@@ -155,7 +204,8 @@ After Paul approves **isolated staging**:
    approved preview site's origin. Remove localhost origins for external staging.
    Bind `DB`, `REQUEST_LIMIT`, and `CREATE_LIMIT`. Check rate limiter namespace
    IDs `5001`/`5002` do not overlap other applications in the account.
-4. Apply `backend/migrations/0001_journeys.sql` to that staging DB, then deploy
+4. Apply **all** numbered files in `backend/migrations/` (currently `0001` and
+   `0002`) to that staging DB, then deploy
    that Worker using the explicit staging config. These are **remote writes**:
 
    ```sh
@@ -192,6 +242,10 @@ never browser config. Public image generation remains entirely unimplemented/off
 - Migrations are additive. Keep `0001` unchanged once applied to a real DB; future
   schema changes need new numbered migrations. Triggers deliberately block visit
   updates/deletes; future privacy deletion needs an explicit administrator design.
+  `0002` is additive and compatible with the earlier G5 Worker: rolling that
+  Worker back still records shared discoveries via the visit trigger. Do not drop
+  the shared tables/triggers on rollback. Backfill costs scale with stored visits;
+  test against a private backup before any populated remote database migration.
 - Before a migration or public test, export the staging DB to private storage
   with `wrangler d1 export ... --remote --output=<private-path>`, and test restore
   into a separate database. Never commit/export bearer credentials or expose

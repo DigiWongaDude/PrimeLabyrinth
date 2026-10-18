@@ -92,6 +92,16 @@ function getJourneyClient(){
 function openJourney(){
   journeyDialog.showModal();
   journeyMessage.textContent=journeyClient?.snapshot?`Saved revision ${journeyClient.snapshot.revision} · ${journeyClient.snapshot.historyCount} historical visits. Retry / resume refreshes from the server.`:'Connect to create or resume your G5 traveller. The URL path cannot overwrite a saved journey.';
+  showExploration(journeyClient?.snapshot);
+}
+function showExploration(snapshot){
+  const totals=snapshot?.exploration,discovery=snapshot?.sharedDiscovery;
+  document.querySelector('#shared-exploration').textContent=totals
+    ?`Shared G5 exploration at last sync: ${totals.totalLocations} path locations · ${totals.uniqueTriples} distinct prime triples.`
+    :'Every connected G5 traveller contributes to the same shared exploration archive.';
+  document.querySelector('#shared-discovery').textContent=discovery
+    ?`${discovery.isFirstDiscoverer?'You first mapped this location.':'Another traveller first mapped this location.'} ${discovery.travellerCount} traveller(s) have reached this exact path. This is a mapped location, not an AI image.`
+    :'';
 }
 function applyJourney(result,source=null,action=null){
   const oldPath=source?.path??[],snapshot=result.snapshot,newPath=decodePath(snapshot.activePath);
@@ -100,6 +110,7 @@ function applyJourney(result,source=null,action=null){
   if(!result.conflict&&action==='back'&&oldPath.length===newPath.length+1&&encodePath(oldPath.slice(0,-1))===snapshot.activePath)game.load(oldPath.at(-1));
   game.notice=result.conflict?'Another session changed this journey, or the move was rejected. Loaded the saved route; no move was replayed.':`Saved · revision ${snapshot.revision} · ${snapshot.historyCount} historical visits`;
   game.sync();journeyMessage.textContent=game.notice;
+  showExploration(snapshot);
 }
 async function connectJourney(){
   if(g5Busy)return;g5Busy=true;

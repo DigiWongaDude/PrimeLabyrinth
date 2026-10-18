@@ -47,18 +47,44 @@ function visitJSON(v: Visit) {
 async function findTraveller(db: DB, tokenHash: string) {
   return db.prepare('SELECT id,active_path,revision FROM travellers WHERE token_hash=?').bind(tokenHash).first<Traveller>();
 }
+async function exploration(db: DB) {
+  // One read transaction: derived counts, never independently incremented totals.
+  const [totals,recent] = await db.batch<Record<string,string|number|null>>([
+    db.prepare(`SELECT (SELECT count(*) FROM discoveries) AS totalLocations,
+      (SELECT count(*) FROM (SELECT a,b,c FROM discoveries GROUP BY a,b,c)) AS uniqueTriples,
+      (SELECT count(DISTINCT traveller_id) FROM visits) AS contributors,
+      (SELECT count(*) FROM visits) AS contributions`),
+    db.prepare(`SELECT generation,root_triple AS rootTriple,path,canonical_path AS canonicalPath,
+      parent_path AS parentPath,a,b,c,first_discovered_at AS firstDiscoveredAt
+      FROM discoveries ORDER BY first_discovered_at DESC,canonical_path LIMIT 10`)
+  ]);
+  // Explicit public projection: no owner IDs, credentials or personal timelines.
+  return { ...totals.results[0], recentDiscoveries: recent.results.map(row => ({
+    generation:row.generation,rootTriple:row.rootTriple,path:row.path,canonicalPath:row.canonicalPath,
+    parentPath:row.parentPath,triple:[row.a,row.b,row.c],firstDiscoveredAt:row.firstDiscoveredAt
+  })) };
+}
 async function state(db: DB, id: string) {
   // One statement gives a coherent snapshot even with another browser writing.
   const row = await db.prepare(`SELECT t.id,t.active_path,t.revision,v.a,v.b,v.c,v.discovered_at,
     v.path,v.canonical_path,v.parent_path,
-    (SELECT count(*) FROM visits h WHERE h.traveller_id=t.id) AS history_count
-    FROM travellers t JOIN visits v ON v.traveller_id=t.id AND v.path=t.active_path WHERE t.id=?`)
-    .bind(id).first<Traveller & Visit & { history_count: number }>();
+    (SELECT count(*) FROM visits h WHERE h.traveller_id=t.id) AS history_count,
+    d.first_discovered_at,d.first_traveller_id=t.id AS is_first_discoverer,
+    (SELECT count(*) FROM visits h WHERE h.canonical_path=v.canonical_path) AS location_travellers,
+    (SELECT count(*) FROM discoveries) AS total_locations,
+    (SELECT count(*) FROM (SELECT a,b,c FROM discoveries GROUP BY a,b,c)) AS unique_triples
+    FROM travellers t JOIN visits v ON v.traveller_id=t.id AND v.path=t.active_path
+    JOIN discoveries d ON d.canonical_path=v.canonical_path WHERE t.id=?`)
+    .bind(id).first<Traveller & Visit & { history_count:number; first_discovered_at:string;
+      is_first_discoverer:number; location_travellers:number; total_locations:number; unique_triples:number }>();
   if (!row) fail(404, 'traveller_not_found');
   const active = path(row.active_path);
   return { travellerId: row.id, generation: 5, geometryGeneration: 4, revision: row.revision,
     activePath: row.active_path, string: Array.from({length:active.length+1},(_,i)=>encodePath(active.slice(0,i))),
-    visit: visitJSON(row), historyCount: row.history_count, worldFloor: null };
+    visit: visitJSON(row), historyCount: row.history_count, worldFloor: null,
+    sharedDiscovery: { canonicalPath:row.canonical_path,firstDiscoveredAt:row.first_discovered_at,
+      isFirstDiscoverer:row.is_first_discoverer===1,travellerCount:row.location_travellers },
+    exploration: { totalLocations:row.total_locations,uniqueTriples:row.unique_triples } };
 }
 function ack(c: Command) { return { requestId: c.request_id, revision: c.expected_revision + 1, activePath: c.result_path }; }
 async function command(db: DB, traveller: Traveller, data: Record<string, unknown>, action: string) {
@@ -119,9 +145,11 @@ export default {
       const ip = request.headers.get('CF-Connecting-IP') || 'local';
       if (!(await env.REQUEST_LIMIT.limit({key:ip})).success) fail(429,'rate_limited');
       if (route === '/v1/health' && request.method === 'GET') return respond({ok:true,generation:5});
+      const db = env.DB.withSession('first-primary');
+      if (route === '/v1/exploration' && request.method === 'GET') return respond(await exploration(db));
       const token = request.headers.get('Authorization')?.match(/^Bearer ([0-9a-f]{64})$/)?.[1];
       if (!token) fail(401,'credential_required');
-      const tokenHash = await hash(token), db = env.DB.withSession('first-primary');
+      const tokenHash = await hash(token);
       let traveller = await findTraveller(db,tokenHash);
       if (route === '/v1/travellers' && request.method === 'POST') {
         exact(await body(request),[]);

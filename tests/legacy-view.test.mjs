@@ -92,3 +92,15 @@ test('G5 UI waits for confirmation, restores doorway on return, and keeps path o
   assert.match(run('game.notice'),/not confirmed.*offline/);
   assert.equal(run('g5Busy'),false);
 });
+
+test('G5 displays shared counts separately from private history and distinguishes attribution',()=>{
+  const run=appHarness('http://api');
+  run('applyJourney({snapshot:{activePath:"0",revision:1,historyCount:2,exploration:{totalLocations:100,uniqueTriples:40},sharedDiscovery:{isFirstDiscoverer:true,travellerCount:3}},conflict:false});');
+  assert.match(run('game.notice'),/2 historical visits/);
+  assert.match(run('document.querySelector("#shared-exploration").textContent'),/100 path locations.*40 distinct prime triples/);
+  assert.match(run('document.querySelector("#shared-discovery").textContent'),/You first mapped.*3 traveller/);
+  run('showExploration({sharedDiscovery:{isFirstDiscoverer:false,travellerCount:4}})');
+  assert.match(run('document.querySelector("#shared-discovery").textContent'),/Another traveller first mapped/);
+  run('showExploration(null)');
+  assert.equal(run('document.querySelector("#shared-discovery").textContent'),'');
+});
