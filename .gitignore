@@ -1,0 +1,9 @@
+node_modules/
+.wrangler/
+.worker-build/
+.env*
+.dev.vars*
+worker-configuration.d.ts
+coverage/
+*.sqlite*
+*-credential.json
