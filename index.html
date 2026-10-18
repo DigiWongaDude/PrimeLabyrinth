@@ -14,6 +14,11 @@
       <h1>THE BETWEEN <span>/ THRESHOLDS</span></h1>
       <p id="room-info">P7 (2,2,3) · visit 2,2,3:ROOT</p>
     </header>
+    <div id="camera-controls" hidden aria-label="Camera rotation">
+      <button id="rotate-left" type="button" aria-label="Rotate view left">↶</button>
+      <span id="camera-angle" aria-live="polite">View 0°</span>
+      <button id="rotate-right" type="button" aria-label="Rotate view right">↷</button>
+    </div>
     <section id="status" aria-live="polite">Tap the floor to walk. Tap a doorway to travel.</section>
     <nav>
       <button id="back" type="button" disabled>Return</button>
@@ -24,6 +29,7 @@
           <button type="button" role="menuitem" data-generation="1">Generation 1 · Original</button>
           <button type="button" role="menuitem" data-generation="2">Generation 2 · Path architecture</button>
           <button type="button" role="menuitem" data-generation="3">Generation 3 · Room shapes</button>
+          <button type="button" role="menuitem" data-generation="4">Generation 4 · Cutaway + rotation</button>
         </div>
       </div>
       <button id="full" type="button">Full screen</button>
