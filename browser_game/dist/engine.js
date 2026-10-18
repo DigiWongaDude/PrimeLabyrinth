@@ -81,11 +81,19 @@ export function makeTerrain(doors) {
   for (const d of doors) { const [x,y]=d.approach,[dx,dy]=INWARD[d.wall]; for(let step=0;step<Math.round(d.level/STEP_HEIGHT);step++){const k=key(Math.trunc(x+dx*step),Math.trunc(y+dy*step));heights.set(k,Math.max(heights.get(k)||0,d.level-step*STEP_HEIGHT));} }
   return heights;
 }
+
+const DOOR_PATTERNS=[[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]];
+export function visitSeed(room,previous,path,generation=2){return stableSeed(`visit-architecture-v${generation}`,diamondRows(room,previous),encodePath(path));}
+export function doorPattern(room,previous,path,block=0,generation=2){
+  if(generation<2)return DOOR_PATTERNS[0];
+  const choice=stableSeed(`door-distribution-v${generation}`,diamondRows(room,previous),encodePath(path),block)%BigInt(DOOR_PATTERNS.length);
+  return DOOR_PATTERNS[Number(choice)];
+}
 function neighbours(cell, terrain) { const [x,y]=cell,h=terrain.get(key(x,y))||0; return [[x-1,y],[x+1,y],[x,y-1],[x,y+1]].filter(([a,b])=>a>=0&&a<12&&b>=0&&b<12&&Math.abs((terrain.get(key(a,b))||0)-h)<=STEP_HEIGHT+.001); }
 function reachable(start,terrain){const first=cellOf(start), seen=new Set([key(...first)]),todo=[first];while(todo.length){for(const n of neighbours(todo.pop(),terrain)){const k=key(...n);if(!seen.has(k)){seen.add(k);todo.push(n);}}}return seen;}
 
-export function makeDoors(room, entrance=rootEntrance(), previous=null) {
-  const choices=targets(room), walls=RELATIVE_WALLS[entrance.wall], assignments=choices.map((_,i)=>walls[i%3]);
+export function makeDoors(room, entrance=rootEntrance(), previous=null, path=[], generation=1) {
+  const choices=targets(room), walls=RELATIVE_WALLS[entrance.wall], assignments=choices.map((_,i)=>walls[doorPattern(room,previous,path,Math.floor(i/3),generation)[i%3]]);
   const totals=Object.fromEntries(walls.map(w=>[w,assignments.filter(x=>x===w).length])), counts=Object.fromEntries(walls.map(w=>[w,0]));
   const result=choices.map((target,index)=>{const wall=assignments[index],rank=counts[wall]++;let position=Math.max(1.5,Math.min(10.5,Math.floor(ROOM_SIZE*(rank+1)/(totals[wall]+1))+.5));if(wall===walls[0]&&totals[wall]===1)position=entrance.position;const seed=stableSeed("wayfarer-levels-v2",diamondRows(room,previous),index);let level=sum(room)<=11?0:.75*Number(seed%3n);if(rank)level=Math.max(.75,level);return door(index,wall,position,level,target);});
   const raised=[...result].reverse().filter(d=>d.level);
@@ -100,4 +108,4 @@ export function walkRoute(start, goal, terrain) {
 
 export function encodePath(path){return path.length?path.map(i=>i<16?i.toString(16).toUpperCase():`[${i.toString(16).toUpperCase()}]`).join(""):"ROOT";}
 export function decodePath(code){if(!code||code.toUpperCase()==="ROOT")return[];const out=[];for(let i=0;i<code.length;){if(code[i]==="["){const end=code.indexOf("]",i);if(end<0)throw Error("Bad path");out.push(parseInt(code.slice(i+1,end),16));i=end+1;}else{const n=parseInt(code[i],16);if(Number.isNaN(n))throw Error("Bad path");out.push(n);i++;}}return out;}
-export function replay(path){const rooms=[[...START]],frames=[rootEntrance()];for(const index of path){const current=rooms.at(-1),previous=rooms.length>1?rooms.at(-2):null,doors=makeDoors(current,frames.at(-1),previous);if(index<0||index>=doors.length)throw Error(`Door ${index} does not exist at P${sum(current)}`);frames.push(arrivalFrom(doors[index],current));rooms.push([...doors[index].target]);}return {rooms,frames};}
+export function replay(path,generation=1){const rooms=[[...START]],frames=[rootEntrance()];for(let depth=0;depth<path.length;depth++){const index=path[depth],current=rooms.at(-1),previous=rooms.length>1?rooms.at(-2):null,doors=makeDoors(current,frames.at(-1),previous,path.slice(0,depth),generation);if(index<0||index>=doors.length)throw Error(`Door ${index} does not exist at P${sum(current)}`);frames.push(arrivalFrom(doors[index],current));rooms.push([...doors[index].target]);}return {rooms,frames};}

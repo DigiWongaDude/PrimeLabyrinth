@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {accentFor,encodePath,decodePath,makeDoors,makeTerrain,replay,targets,walkRoute} from "./dist/engine.js";
+import {accentFor,doorPattern,encodePath,decodePath,makeDoors,makeTerrain,replay,targets,visitSeed,walkRoute} from "./dist/engine.js";
 
 const fixtures=[
   {path:[],room:[2,2,3],previous:null,accent:[202,230,122],targets:[[3,3,5]],entrance:["SOUTH",6.5,0],doors:[[0,"NORTH",6.5,0,[3,3,5]]]},
@@ -22,3 +22,8 @@ for(const fixture of fixtures)test(`Python parity at ${encodePath(fixture.path)}
 
 test("path IDs survive links",()=>{for(const path of [[],[0,1,2,15],[16,26,1]])assert.deepEqual(decodePath(encodePath(path)),path)});
 test("invalid transitions are rejected",()=>assert.throws(()=>replay([1]),/does not exist/));
+test("generation 1 retains the original OLR distribution",()=>assert.deepEqual(doorPattern([5,7,17],[5,5,13],[0,0,1,0,1,0],0,1),[0,1,2]));
+test("the complete path contributes to the versioned visit identity",()=>{
+  const room=[5,7,17],previous=[5,5,13];
+  assert.notEqual(visitSeed(room,previous,[0,0,1,0,1,0]),visitSeed(room,previous,[0,1,0,0,1,0]));
+});
