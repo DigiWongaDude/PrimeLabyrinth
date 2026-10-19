@@ -164,7 +164,7 @@ async function accountAction(action){
 const inputValue=id=>document.querySelector(`#${id}`).value;
 document.querySelector('#account-form').onsubmit=event=>{event.preventDefault();void accountAction(c=>c.login(inputValue('account-username'),inputValue('account-password')))};
 document.querySelector('#account-signup').onclick=()=>accountAction(c=>c.signup(inputValue('account-username'),inputValue('account-password'),inputValue('account-name')));
-document.querySelector('#account-upgrade').onclick=()=>accountAction(c=>{const legacy=getJourneyClient();if(!legacy.record?.registered||legacy===c.journey)throw new Error('Connect your earlier traveller first.');return c.signup(inputValue('account-username'),inputValue('account-password'),inputValue('account-name'),legacy.record.token)});
+document.querySelector('#account-upgrade').onclick=()=>accountAction(c=>{const legacy=getJourneyClient();if(!legacy.record?.registered||legacy===c.journey)throw new Error('Connect your earlier traveller first.');if(legacy.record.pending)throw new Error('Retry your pending move before upgrading your traveller.');return c.signup(inputValue('account-username'),inputValue('account-password'),inputValue('account-name'),legacy.record.token)});
 document.querySelector('#account-resume').onclick=()=>accountAction(c=>c.resume());
 document.querySelector('#account-logout').onclick=()=>accountAction(async c=>{await c.logout();return null});
 document.querySelector('#account-rename').onclick=()=>accountAction(c=>c.name(inputValue('account-name')));

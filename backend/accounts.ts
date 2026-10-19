@@ -126,21 +126,27 @@ async function createAccount(db:DB,env:AccountEnv,options:{name:string;username:
 }
 // CAS credential changes invalidate all old sessions atomically. Competing
 // password reset/change/link operations can never silently overwrite each other.
-async function changeCredentials(db:DB,a:Account,values:{username:string|null;passwordHash:string|null;sub:string|null;recoveryHash:string}) {
+async function changeCredentials(db:DB,a:Account,values:{username:string|null;passwordHash:string|null;sub:string|null;recoveryHash:string},identity:Identity|null=null) {
+  if (identity && (identity.id!==a.traveller_id || identity.account_version!==a.version)) fail(401,'sign_in_again');
   const token=randomToken(),tokenHash=await hash(token),expiresAt=now()+SESSION_SECONDS;
   try {
     const results=await db.batch([
       db.prepare(`UPDATE accounts SET username=?,password_hash=?,google_sub=?,recovery_hash=?,version=version+1
-        WHERE traveller_id=? AND version=? RETURNING traveller_id`)
-        .bind(values.username,values.passwordHash,values.sub,values.recoveryHash,a.traveller_id,a.version),
-      db.prepare(`DELETE FROM sessions WHERE traveller_id=? AND account_version<>(SELECT version FROM accounts WHERE traveller_id=?)`)
-        .bind(a.traveller_id,a.traveller_id),
+        WHERE traveller_id=? AND version=? AND (? IS NULL OR EXISTS (
+          SELECT 1 FROM sessions s WHERE s.token_hash=? AND s.traveller_id=accounts.traveller_id
+          AND s.account_version=accounts.version AND s.expires_at>? AND s.authenticated_at>=?
+        )) RETURNING traveller_id`)
+        .bind(values.username,values.passwordHash,values.sub,values.recoveryHash,a.traveller_id,a.version,
+          identity?.session_hash||null,identity?.session_hash||null,now(),now()-FRESH_SECONDS),
+      // This must immediately follow the UPDATE: changes() ties session creation
+      // to this transaction's CAS winner, not merely matching credential values.
       db.prepare(`INSERT INTO sessions(token_hash,traveller_id,account_version,authenticated_at,expires_at)
-        SELECT ?,traveller_id,version,?,? FROM accounts WHERE traveller_id=? AND version=? AND recovery_hash=?
-        AND username IS ? AND password_hash IS ? AND google_sub IS ?`)
-        .bind(tokenHash,now(),expiresAt,a.traveller_id,a.version+1,values.recoveryHash,values.username,values.passwordHash,values.sub)
+        SELECT ?,traveller_id,version,?,? FROM accounts WHERE traveller_id=? AND version=? AND changes()=1`)
+        .bind(tokenHash,now(),expiresAt,a.traveller_id,a.version+1),
+      db.prepare(`DELETE FROM sessions WHERE traveller_id=? AND account_version<>(SELECT version FROM accounts WHERE traveller_id=?)`)
+        .bind(a.traveller_id,a.traveller_id)
     ]);
-    if (!results[0].results.length || !results[2].meta.changes) fail(409,'account_changed');
+    if (!results[0].results.length || !results[1].meta.changes) fail(409,'account_changed');
   } catch(error) {
     if (/UNIQUE constraint/.test(String(error))) fail(409,'account_unavailable');
     throw error;
@@ -255,7 +261,7 @@ export async function accountRoute(request:Request,env:AccountEnv,db:DB,identity
     if (attempt.mode==='link') {
       const a=await account(db,identity!.id);
       if ((existing && existing.traveller_id!==a.traveller_id) || (a.google_sub && a.google_sub!==sub)) fail(409,'identity_already_linked');
-      return changeCredentials(db,a,{username:a.username,passwordHash:a.password_hash,sub,recoveryHash:a.recovery_hash});
+      return changeCredentials(db,a,{username:a.username,passwordHash:a.password_hash,sub,recoveryHash:a.recovery_hash},identity);
     }
     if (attempt.mode==='migrate' && existing) fail(409,'identity_already_linked');
     if (existing) return issueSession(db,existing);
@@ -283,6 +289,7 @@ export async function accountRoute(request:Request,env:AccountEnv,db:DB,identity
   }
   fresh(identity);
   const a=await account(db,identity.id);
+  if (a.version!==identity.account_version) fail(401,'sign_in_again');
   if (route==='/v1/account/name') {
     exact(data,['displayName']);
     await db.prepare('UPDATE profiles SET display_name=? WHERE traveller_id=? AND anonymised=0').bind(displayName(data.displayName),identity.id).run();
@@ -292,12 +299,12 @@ export async function accountRoute(request:Request,env:AccountEnv,db:DB,identity
     exact(data,['currentPassword','username','password']);
     await throttle(db,`password:${identity.id}`,10);
     if (a.password_hash && (typeof data.currentPassword!=='string'||data.currentPassword.length>128||!passwordMatches(data.currentPassword,a.password_hash))) fail(401,'invalid_credentials');
-    return changeCredentials(db,a,{username:username(data.username),passwordHash:passwordHash(password(data.password)),sub:a.google_sub,recoveryHash:a.recovery_hash});
+    return changeCredentials(db,a,{username:username(data.username),passwordHash:passwordHash(password(data.password)),sub:a.google_sub,recoveryHash:a.recovery_hash},identity);
   }
   if (route==='/v1/account/recovery') {
     exact(data,[]);
     const recoveryKey=randomToken();
-    return {...await changeCredentials(db,a,{username:a.username,passwordHash:a.password_hash,sub:a.google_sub,recoveryHash:await hash(recoveryKey)}),recoveryKey};
+    return {...await changeCredentials(db,a,{username:a.username,passwordHash:a.password_hash,sub:a.google_sub,recoveryHash:await hash(recoveryKey)},identity),recoveryKey};
   }
   if (route==='/v1/account/anonymise') {
     exact(data,['confirmation']);

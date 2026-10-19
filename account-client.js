@@ -23,6 +23,11 @@ export class AccountClient {
   }
   async accept(result){
     const old=this.journey.record;
+    if(old?.pending && this.session?.profile?.publicId!==result.profile.publicId)throw new Error('Resolve your pending move before changing travellers.');
+    // Rotation/recovery has already invalidated the old token. Keep the new
+    // credential even when the following journey fetch loses its connection.
+    this.session={api:this.base,token:result.token,expiresAt:result.expiresAt,profile:result.profile};
+    this.storage.setItem(ACCOUNT_KEY,JSON.stringify(this.session));
     this.journey.record={api:this.base,token:result.token,registered:true,snapshot:null,pending:null};
     try{
       const snapshot=await this.journey.request('journey');
@@ -30,10 +35,13 @@ export class AccountClient {
       this.journey.record.snapshot=snapshot;
       if(old?.snapshot?.travellerId===snapshot.travellerId)this.journey.record.pending=old.pending;
       this.journey.save();
-      this.session={api:this.base,token:result.token,expiresAt:result.expiresAt,profile:result.profile};
-      this.storage.setItem(ACCOUNT_KEY,JSON.stringify(this.session));
       return {journey:await this.journey.connect(),recoveryKey:result.recoveryKey,profile:result.profile};
-    }catch(error){if(!this.session||this.session.token!==result.token)this.journey.record=old;throw error;}
+    }catch(error){
+      // If the first fetch failed, retain the old snapshot/pending command for
+      // resume; never restore an already-revoked session credential.
+      if(!this.journey.record.snapshot)this.journey.record=old;
+      throw error;
+    }
   }
   async login(username,password){return this.accept(await this.request('auth/login',{username,password},null))}
   async signup(username,password,displayName,legacyToken=null){
@@ -60,7 +68,10 @@ export class AccountClient {
   }
   async changePassword(currentPassword,username,password){return this.accept(await this.request('account/password',{currentPassword,username,password}))}
   async recoveryKey(){return this.accept(await this.request('account/recovery',{}))}
-  async anonymise(confirmation){await this.request('account/anonymise',{confirmation});this.clear()}
+  async anonymise(confirmation){
+    if(this.journey.record?.pending)throw new Error('Retry your pending move before deleting your account.');
+    await this.request('account/anonymise',{confirmation});this.clear();
+  }
   async startGoogle(mode,displayName,legacyToken=null){
     const verifier=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
     const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier));
