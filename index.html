@@ -53,9 +53,12 @@
         <input id="account-password" type="password" autocomplete="current-password" minlength="15" maxlength="128">
         <label for="account-name">Public display name</label>
         <input id="account-name" autocomplete="nickname" maxlength="40" value="Traveller">
+        <label for="account-invitation">Private invitation (new accounts only)</label>
+        <input id="account-invitation" type="password" autocomplete="off" spellcheck="false" maxlength="64" aria-describedby="account-invitation-help">
+        <p id="account-invitation-help">New password and Google accounts need a single-use invitation. Leave this blank to sign in to an existing account. Keep your invitation privately; it is cleared after an attempt and is never saved in this browser.</p>
         <div class="journey-actions">
           <button type="submit">Sign in</button>
-          <button id="account-signup" type="button">Create account</button>
+          <button id="account-signup" type="button">Create invited account</button>
           <button id="account-google" type="button">Sign in with Google</button>
           <button id="account-resume" type="button">Resume account</button>
           <button id="account-logout" type="button">Sign out</button>

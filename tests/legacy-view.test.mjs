@@ -105,3 +105,45 @@ test('G5 displays shared counts separately from private history and distinguishe
   run('showExploration(null)');
   assert.equal(run('document.querySelector("#shared-discovery").textContent'),'');
 });
+
+test('invitation input is sent for new signup and cleared after success or rejection',async()=>{
+  const run=appHarness('http://api');
+  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+  assert.match(html,/id="account-invitation" type="password" autocomplete="off"/);
+  run(`
+    document.querySelector('#account-username').value='tester';
+    document.querySelector('#account-password').value='A disposable password';
+    document.querySelector('#account-name').value='Tester';
+    document.querySelector('#account-invitation').value='  invitation-fixture  ';
+    journeyDialog.querySelectorAll=()=>[document.querySelector('#account-invitation'),document.querySelector('#account-password')];
+    var sent;
+    accountClient={signup:async(...args)=>{sent=args;}};
+  `);
+  await run("document.querySelector('#account-signup').onclick()");
+  assert.equal(run('JSON.stringify(sent)'),JSON.stringify(['tester','A disposable password','Tester',null,'invitation-fixture']));
+  assert.equal(run("inputValue('account-invitation')"),'');
+  run("document.querySelector('#account-invitation').value='private-fixture';accountClient.signup=async()=>{throw new Error('invitation_unavailable')};");
+  await run("document.querySelector('#account-signup').onclick()");
+  assert.equal(run("inputValue('account-invitation')"),'');
+  assert.doesNotMatch(run('journeyMessage.textContent'),/private-fixture/);
+});
+
+test('Google invitation clears before navigation; blank login and linking do not send it',async()=>{
+  const run=appHarness('http://api');
+  run(`
+    document.querySelector('#account-name').value='Tester';
+    document.querySelector('#account-invitation').value='google-fixture';
+    var sent,atNavigation;
+    accountClient={startGoogle:async(...args)=>{sent=args;return 'https://accounts.google.com/example'}};
+    location.assign=url=>{atNavigation={url,value:inputValue('account-invitation')}};
+  `);
+  await run("document.querySelector('#account-google').onclick()");
+  assert.equal(run('JSON.stringify(sent)'),JSON.stringify(['login','Tester',null,'google-fixture']));
+  assert.equal(run('atNavigation.value'),'');
+  await run("document.querySelector('#account-google').onclick()");
+  assert.equal(run('sent[3]'),undefined);
+  run("document.querySelector('#account-invitation').value='must-not-send-for-link';");
+  await run("document.querySelector('#account-link').onclick()");
+  assert.equal(run('sent[0]'),'link');assert.equal(run('sent[3]'),undefined);
+  assert.equal(run('atNavigation.value'),'');
+});

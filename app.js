@@ -167,7 +167,7 @@ async function accountAction(action){
 }
 const inputValue=id=>document.querySelector(`#${id}`).value;
 document.querySelector('#account-form').onsubmit=event=>{event.preventDefault();void accountAction(c=>c.login(inputValue('account-username'),inputValue('account-password')))};
-document.querySelector('#account-signup').onclick=()=>accountAction(c=>c.signup(inputValue('account-username'),inputValue('account-password'),inputValue('account-name')));
+document.querySelector('#account-signup').onclick=()=>accountAction(c=>c.signup(inputValue('account-username'),inputValue('account-password'),inputValue('account-name'),null,inputValue('account-invitation').trim()));
 document.querySelector('#account-upgrade').onclick=()=>accountAction(c=>{const legacy=getJourneyClient();if(!legacy.record?.registered||legacy===c.journey)throw new Error('Connect your earlier traveller first.');if(legacy.record.pending)throw new Error('Retry your pending move before upgrading your traveller.');return c.signup(inputValue('account-username'),inputValue('account-password'),inputValue('account-name'),legacy.record.token)});
 document.querySelector('#account-resume').onclick=()=>accountAction(c=>c.resume());
 document.querySelector('#account-logout').onclick=()=>accountAction(async c=>{await c.logout();return null});
@@ -178,7 +178,10 @@ document.querySelector('#account-recover').onclick=()=>accountAction(c=>c.recove
 document.querySelector('#account-delete').onclick=()=>accountAction(async c=>{await c.anonymise(inputValue('account-delete-confirmation'));return null});
 for(const [id,mode] of [['account-google','login'],['account-link','link'],['account-google-upgrade','migrate']])document.querySelector(`#${id}`).onclick=()=>accountAction(async c=>{
   if(journeyClient?.record?.pending)throw new Error('Retry your pending move first.');
-  const url=await c.startGoogle(mode,inputValue('account-name'),mode==='migrate'?getJourneyClient().record?.token:null);location.assign(url);
+  const invitation=mode==='login'?(inputValue('account-invitation').trim()||undefined):undefined;
+  const url=await c.startGoogle(mode,inputValue('account-name'),mode==='migrate'?getJourneyClient().record?.token:null,invitation);
+  document.querySelector('#account-invitation').value='';
+  location.assign(url);
 });
 const oauthParams=new URLSearchParams(location.search),hasOAuth=oauthParams.has('state')&&(oauthParams.has('code')||oauthParams.has('error'));
 if(hasOAuth){
