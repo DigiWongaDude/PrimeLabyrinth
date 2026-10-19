@@ -2,5 +2,7 @@
 // Never use it for the G1–G4 production bundle and never put credentials here.
 export const G5_API_URL = 'https://between-g5-staging-api.digiwongadude.workers.dev';
 
-// Documentation value for OAuth/hosting checks; app.js uses G5_API_URL above.
-export const G5_FRONTEND_ORIGIN = 'https://between-g5-preview.digiwongadude.com';
+// Candidate Cloudflare Pages hostname for OAuth/hosting checks. UNCONFIRMED:
+// it becomes real only if Paul/Sara provision a Pages project with this exact
+// name. app.js uses G5_API_URL above; this value is documentation only.
+export const G5_FRONTEND_ORIGIN = 'https://between-g5-preview.pages.dev';

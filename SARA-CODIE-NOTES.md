@@ -161,6 +161,14 @@ The backend regression run reported by CODiE after Sara's fix: **36/36 passing**
 ### Paul decision — Workers Paid approved, strict cost discipline (2026-10-19)
 Paul has decided to pay for Cloudflare Workers Paid (base US$5/month) to keep authentication and backend together, with headroom. **Paul alone performs the plan upgrade/purchase.** Target total monthly Cloudflare spend **at or below GBP 10**, approximately GBP 5 extra usage budget, **not** approval for uncapped spend. Cloudflare budget alerts are projected-spend notifications, NOT hard caps. Do not claim the platform guarantees a GBP 10 cap; verify all relevant charges (Workers, D1, other metered services), tax and currency conversion. Before Paul upgrades, prepare read-only cost-control recommendations: budget alerts, per-request CPU limits, rate limiting, anti-abuse and observability, with specific Cloudflare-supported mechanisms and limits. No configuration changes, deployments or purchases without Paul authorisation. Do not weaken scrypt parameters. Benchmark remains useful for latency/cost even with Paid plan.
 
+### CODiE — 2026-10-19, Sara preview/registration correction (follow-up)
+
+Sara reviewed `421a81893ab9798879056fc537df250440ceb5fd` and requested a bounded documentation/config correction. The custom-domain proposal was replaced with the Cloudflare Pages candidate `https://between-g5-preview.pages.dev`, with redirect candidate `https://between-g5-preview.pages.dev/index.html`. Both are explicitly **UNCONFIRMED**: no Pages project or route currently exists, and the exact hostname must be confirmed after provisioning; the existing `workers.dev` hostname remains API-only. No DNS, Cloudflare setting, OAuth console, secret, migration or deployment was touched.
+
+The backend gate was also checked in `backend/accounts.ts`: `REGISTRATION_ENABLED=true` permits any reachable client to sign up; there is no invitation mechanism. The runbook now calls this a short controlled open-registration window, recommends an approved Cloudflare Access/WAF policy for private testing, and states that named Google test users do not restrict password signup. No auth redesign was implemented. `STAGING-HANDOFF.md`, `ACCOUNTS-HANDOFF.md`, `G5-STAGING-ACCOUNTS-RUNBOOK.md`, `g5-config.staging.example.js` and source staging allowlist were updated accordingly.
+
+Follow-up verification: `npm run check` PASS; `npm test` PASS — 5/5 files, 36/36; `npm run test:client` PASS — 18/18; `npm run build:api` PASS; staging Wrangler dry-run PASS — staging D1/rate limits resolved, candidate allowlist visible, both account flags false, no upload. Wrangler emitted only its available-update notice. No remote resources were touched.
+
 ### CODiE — 2026-10-19, G5 staging preparation (Ready for Sara review)
 
 Pulled `codex/g5-persistence` at source SHA `3cb9c4f28a3e1434e9bc79144bdd4248620e808f`. Prepared, but did not deploy, migrate, provision, or change Cloudflare/DNS:

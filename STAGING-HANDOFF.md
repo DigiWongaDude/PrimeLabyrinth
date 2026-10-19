@@ -54,7 +54,7 @@ or copied. Migration names are recorded in the standard Wrangler-compatible
 
 `node staging-smoke.mjs` performs a bounded test against ONLY this staging URL.
 It expects an empty archive and closed registration; do not use unchanged after
-invited journeys are added.
+any account test journeys are added.
 
 | Check | Result |
 | --- | --- |
@@ -74,8 +74,9 @@ this URL is a backend, not a playable game. CORS is not authentication: the
 read-only archive endpoint is internet-accessible with an allowed Origin header.
 
 This is not a hosted two-device recovery test. The existing 36 local tests and
-local journey smoke checks cover saves/atomicity; invited hosted journey testing
-is the next separate acceptance gate.
+local journey smoke checks cover saves/atomicity; controlled hosted account
+journey testing is the next separate acceptance gate. The current backend has
+no invitation gate when registration is enabled.
 
 ## Boundaries and rollback
 
@@ -91,7 +92,9 @@ or delete discoveries. Keep `REGISTRATION_ENABLED=false`. This is the first
 staging deployment, so there is no earlier staging version to roll back to.
 Future staging code can be restored from the commit/config above, after review.
 
-Next approval needed: a specific isolated frontend-preview origin and controlled
-invited registration/testing. Only then connect a preview and verify a private
-recovery code across two real devices. No further work under issue #36 is needed
-unless a reviewer identifies a failed acceptance item.
+Next approval needed: a confirmed isolated frontend-preview origin and a
+controlled account-testing window. Only then connect a preview and verify a
+private recovery code across two real devices. The current backend does not
+enforce invited-only password registration; use an approved access policy or a
+short monitored window. No further work under issue #36 is needed unless a
+reviewer identifies a failed acceptance item.

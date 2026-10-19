@@ -98,15 +98,18 @@ explicit and requires a recently authenticated account and the completed Google
 flow, tied to the same session. A Google identity already owned by a different
 traveller is rejected. We never automatically merge histories.
 
-1. Approve the isolated HTTPS frontend preview proposed by this preparation:
-   `https://between-g5-preview.digiwongadude.com`. Keep G1–G4's production site
-   unchanged. Its exact origin is now listed in the *source* staging
-   `ALLOWED_ORIGINS`; no Cloudflare setting or DNS record has been changed.
+1. Use an isolated Cloudflare Pages preview, not a custom domain:
+   `https://between-g5-preview.pages.dev` (**UNCONFIRMED candidate**; it exists
+   only if a Pages project is provisioned with that exact name). Keep G1–G4's
+   production site unchanged. The candidate is listed in the *source* staging
+   `ALLOWED_ORIGINS`; no Cloudflare setting, Pages project or DNS record has
+   been changed. The existing `workers.dev` hostname remains API-only.
 2. In Paul's Google Cloud project, configure OAuth consent and a **Web application**
    OAuth client. While testing, restrict audience to named test users.
-3. Set its authorised redirect URI to the exact preview page:
-   `https://between-g5-preview.digiwongadude.com/index.html` (no query or
-   fragment). The value must match `GOOGLE_REDIRECT_URI` byte-for-byte. Approve its JavaScript
+3. Once the Pages project name is confirmed, set its authorised redirect URI to
+   the exact preview page (candidate, currently unconfirmed):
+   `https://between-g5-preview.pages.dev/index.html` (no query or fragment).
+   The value must match `GOOGLE_REDIRECT_URI` byte-for-byte. Approve its JavaScript
    origin as appropriate. Only `openid email` scopes are requested.
 4. Set public `GOOGLE_CLIENT_ID` and `GOOGLE_REDIRECT_URI` in the staging config.
    Store `GOOGLE_CLIENT_SECRET` through Cloudflare's secret UI or
@@ -115,7 +118,7 @@ traveller is rejected. We never automatically merge histories.
    closed with `google_not_configured`.
 5. Configure the preview's `G5_API_URL` to the staging API only. Test Google login,
    rejected/cancelled/expired flow, explicit linking and cross-device restoration
-   with real invited Google identities. Provider responses in automated tests are
+   with real named Google test users. Provider responses in automated tests are
    mocked and RSA-signed; live Google acceptance is still pending.
 
 ## Local checks and preview
@@ -157,10 +160,12 @@ preview origin and Google configuration above are settled.
 5. Verify Minotaur root, unauthorized `/v1/` denial, health, private-journey denial,
    closed registration, and actual stored counts. `staging-smoke.mjs` still assumes
    an empty archive and closed flags; do not run it unchanged after invited visits.
-6. Only after Paul enables the approved preview/accounts/invited registration,
-   test two devices and two travellers reaching the same path, account upgrade,
-   Google linking and discovery privacy. Keep the cap small. Close registration
-   afterward if invited testing is finished.
+6. Only after Paul approves a controlled account test window, test two devices
+   and two travellers reaching the same path, account upgrade, Google linking
+   and discovery privacy. `REGISTRATION_ENABLED=true` is open registration to
+   any client that can reach the endpoint; the current code has no invitation
+   gate. Use Cloudflare Access/WAF or a short, monitored window if private
+   testing is required, and close registration afterward.
 
 Rollback: disable new registrations/accounts, retain D1 and all immutable history.
 Restore a reviewed compatible Worker version if needed. Do not undo the additive
