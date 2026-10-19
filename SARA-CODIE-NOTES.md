@@ -84,3 +84,18 @@ Pulled `codex/g5-persistence` fast-forward from `ad8f4aa` to Sara's four added r
 `npm test` FAIL: 35 passed, 1 failed, 36 total across 5 files (4 files passed; `backend/accounts.test.ts` 17 tests with 1 failure). The failure is Sara's new `anonymisation preserves public discovery ownership...` case at line 236: it expects the new account to own path `0`, but the shared D1 test state has path `0` already owned by an earlier test. This is test isolation/order dependence, not a reported production assertion. Proposed fix: reset/isolated D1 state per test (preferred), or choose a guaranteed-unclaimed canonical path and assert against that path; then rerun the full suite. No application fix was applied in verification-only mode.
 
 No remote migration, deployment, registration enablement, Cloudflare setting change or branch merge occurred. The generated staging dry-run directory was removed after verification. Sara should fix the test isolation issue, rerun all requested checks, and update this note with the final result.
+
+
+### Sara / Paul — model-routing policy, 2026-10-19
+
+**Paul-approved working arrangement:** Sara is the primary point of contact and coordinator. CODiE should read this note at the start of each session and route work by difficulty to conserve agentic usage. Paul retains sole authority over **all** deployments (including staging), remote migrations, paid-plan changes, merges to live branches, and enabling public registration.
+
+**Prefer GPT-5.6 Luna High** for bounded, mechanical and verifiable tasks: pulling a branch; installing dependencies; running tests, lint/type checks and Wrangler dry-runs; collecting logs and exact pass/fail counts; reproducing known failures; small, well-understood test repairs; documentation; committing/pushing a concise report. Stop and escalate to Sara rather than making speculative changes.
+
+**Reserve Astra High** for security-sensitive or complex design/implementation: identity and session architecture, OAuth/OIDC security changes, nontrivial concurrency/transaction bugs, database migration correctness, deep debugging after cheaper-model attempts, or decisions with serious data-loss/security implications. Do not use Astra just to execute commands or summarize results.
+
+**Per-task routing:** Split each assignment into independent small tasks; choose the least costly capable model for each. CODiE cannot be assumed to switch its own model or run simultaneous model tiers unless its host explicitly supports that. If a model change requires user interaction, ask Sara to coordinate with Paul rather than silently claiming it was switched. Report which model was actually used, time/usage before and after where available, tested SHA, test outcomes and whether any work remains unverified.
+
+**Observed:** Paul used 5.6 Luna High for a verification-only run, with no *visible* change in the rounded five-hour usage indicator (65% remaining); weekly indicator showed 94% remaining. This is encouraging but does not establish zero consumption or guaranteed future pricing. Preserve the full reset unless Paul directs otherwise.
+
+**Current immediate task:** Sara committed a test-order-independent anonymisation regression fix in `a9ec8c3650efa5eaf25f6991110c5544394ac689`. The earlier 35/36 test result predates this fix. A Luna-class rerun of `npm test` at or after that SHA is required before claiming green; no deployment.
