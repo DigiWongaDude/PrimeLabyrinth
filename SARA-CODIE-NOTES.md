@@ -99,3 +99,20 @@ No remote migration, deployment, registration enablement, Cloudflare setting cha
 **Observed:** Paul used 5.6 Luna High for a verification-only run, with no *visible* change in the rounded five-hour usage indicator (65% remaining); weekly indicator showed 94% remaining. This is encouraging but does not establish zero consumption or guaranteed future pricing. Preserve the full reset unless Paul directs otherwise.
 
 **Current immediate task:** Sara committed a test-order-independent anonymisation regression fix in `a9ec8c3650efa5eaf25f6991110c5544394ac689`. The earlier 35/36 test result predates this fix. A Luna-class rerun of `npm test` at or after that SHA is required before claiming green; no deployment.
+
+
+### Paul — mandatory manual model switching protocol (2026-10-19)
+
+**Correction to the preceding model-routing note:** Only **Paul** controls the CODiE model selector. CODiE must **never** attempt to switch models automatically, assume that it has switched, or continue a task that needs a different model.
+
+When a task needs a different tier, CODiE must **STOP** and tell Paul via Sara, using the exact clear instruction:
+
+> **Switch me over to [Astra High / 5.6 Luna High].**
+
+Then CODiE **waits**. Paul changes the model himself and says:
+
+> **Carry on CODiE.**
+
+Only then may CODiE resume, confirming the actual model if visible. Do not continue silently while waiting. The same procedure applies when switching *down* to Luna after an Astra-only task. Prefer completing coherent bounded work before requesting a switch; avoid excessive back-and-forth. Sara remains Paul's single coordination point whenever possible.
+
+No deployment authority changes: Paul alone deploys.
