@@ -65,3 +65,13 @@ Read `backend/accounts.ts`, `backend/worker.ts`, `backend/migrations/0003_accoun
 - An already committed move is idempotently retryable with a rotated session, while the old/expired sessions cannot act.
 
 **Test execution:** These two newly authored tests have **NOT BEEN RUN**; this is a source-only GitHub review. CODiE's earlier 13/13 applies to the prior commit, not to this test addition. Full `npm ci`, `npm run check`, `npm test`, `npm run test:client`, staging Wrangler dry-run and real Google sign-in remain outstanding. Next: execute tests in a checked-out environment; investigate scrypt Worker CPU limits before any staging enablement. Paul deploys only after a verified Ready to Deploy handoff.
+
+### Sara — 2026-10-19, second adversarial auth review
+
+Added two more security regression cases, commit [`37a9ccc`](https://github.com/DigiWongaDude/PrimeLabyrinth/commit/37a9ccc00c80eef15620040f064f213347f93357):
+- Google account-link callback must fail if the initiating session was logged out before completion, without attaching the Google subject.
+- Public discovery and exploration projections must never contain usernames, bearer tokens, recovery keys, or internal traveller IDs.
+
+The auth suite now has **17 authored cases** (13 previously run by CODiE; 4 newly added by Sara and **not yet run**). Reviewed OAuth state/challenge/session coupling, single-use attempt consumption, `sub`-based account association, and staging's disabled flags by reading source. This is **not** an independent runtime or security signoff.
+
+**Execution limitation:** The GitHub connector exposes file commits but no local checkout/execution. The container has Node/npm, but cannot resolve GitHub to fetch the repository; do not report CI/test success. Next meaningful step is an authorised checkout or CI run of HEAD and full regression plus staging-config dry-run. Keep deployments under Paul's control.
