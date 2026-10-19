@@ -346,3 +346,68 @@ throttling, lost-response login and non-leakage. Frontend and operator utility
 follow. Keep the public waiting list out of scope. No deployment, remote D1,
 Cloudflare/DNS changes, secrets, registration enablement or production merge.
 Paul retains those controls. Ready for Sara review at this schema checkpoint.
+
+### CODiE to Sara — invitation API and input ready for review, 2026-10-19
+
+Paul requested continuation, then an immediate commit/handoff for your review.
+Pulled `codex/g5-persistence` at `1d468cdba4104311e41b2ff10db52368d9c00be8`;
+no newer Sara comment was present in these notes. Implementation commits:
+`5780ed7` (schema/API/adversarial tests) and
+`09be8b36c5f8f04c1c99ce18aeaeda2d9d58b224` (frontend input; tested application tree).
+This supersedes the schema-only status above, not its requirement for review.
+
+**DONE:** promoted migration 0004 into active migrations with the matching API;
+atomic single-use invitation redemption/account/initial-session creation;
+transactionally revalidated legacy credential proof and preserved attribution;
+unknown legacy creation denied under all nine account/registration flag
+combinations; password admission precheck before unchanged scrypt; D1 shared
+five-attempt/IP/minute admission bucket; Google attempt-bound digest with no
+callback replacement; existing Google/password login and linking preserved with
+registration closed. Manual masked invitation input clears after use and is not
+persisted or sent in Google's redirect URL. Minotaur handler unchanged.
+
+21 schema tests and 14 invitation-route tests cover local D1 rollback, concurrent
+password/Google/mixed redemption, stale legacy proof and competing upgrades,
+revocation, bad provider nonce, session failure, cap/username conflicts,
+lost-response recovery, throttling and non-leakage. Baseline fixtures now seed
+legacy identities before migration 0004; no HTTP test bypass was introduced.
+Google transport is mocked with locally signed OIDC tokens, NOT real sign-in.
+
+**Verification actually run during this implementation:**
+
+- `npm test`: final post-commit rerun at `09be8b36...`: 71/71 PASS, 7/7 files,
+  zero failures, exit 0, 13.74 seconds; no log-write error in this rerun.
+- `npm run test:client`: final rerun 20/20 PASS, zero failed/skipped/cancelled,
+  exit 0, 527.747 ms. Includes two DOM-stub invitation-handler tests.
+- `npm run check`: final rerun PASS, exit 0. Application typecheck excludes test
+  TS; Vitest executes those tests.
+- `npm run build:api`: PASS, exit 0, dry-run only, 73.34 KiB / 19.72 KiB gzip.
+- `npx wrangler deploy --config wrangler.staging.jsonc --dry-run --outdir .worker-build/staging`:
+  PASS, exit 0, same bundle sizes, both enablement flags false; no upload.
+- `git diff --check`: PASS. Git reports LF-to-CRLF conversion notices.
+- Initial targeted invitation-route run: 14/14 PASS, exit 0, with a local
+  Wrangler log-write EPERM warning/error. Subsequent full run had no such error.
+  Build runs advertised Wrangler 4.151.2; installed 4.151.1 was not upgraded.
+- No dependency changes or `npm ci` this turn. No hosted smoke command run.
+
+**PARTIAL:** local implementation only, pending independent security review,
+especially admission/proof trigger ordering and migration/Worker compatibility.
+UI tests use DOM stubs, not visual/mobile browser testing. Local test success
+does not establish that the hosted API contains this invitation gate.
+
+**BROKEN / KNOWN LIMITATION:** historical `smoke.mjs` (`smoke:local`) still
+expects legacy auto-creation and is incompatible with deliberate route closure;
+not run or claimed passing. `staging-smoke.mjs` now expects `use_account_signup`,
+but its empty-archive assumptions still need review before Paul uses it.
+
+**NOT STARTED / LEFT FOR SARA:** private issuance/revocation utility and secure
+delivery-file permissions; operator non-leakage checks; adaptation of smoke
+fixture provisioning; real Google sign-in, hosted two-device/attribution and
+mobile visual acceptance. Review `backend/INVITATIONS.md` and updated runbook
+before deployment planning. Do not issue real invitations through shell args,
+console logs, Git, URLs or SQL exports. Public waiting-list work is out of scope.
+
+Migration 0004 and its Worker must be released together only after review.
+Both committed flags remain false. No deployment, remote migration, secrets,
+Cloudflare/DNS settings, registration enablement or production merge occurred.
+No model switch. Paul alone controls deployment. Stopping for Sara review.

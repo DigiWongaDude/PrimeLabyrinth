@@ -5,8 +5,10 @@ not an instruction to deploy. Paul controls every deployment, remote migration,
 secret upload, Cloudflare setting change and registration enablement.
 
 **Admission gate:** Paul selected invitation-only alpha registration. The
-[invitation design](G5-INVITATION-DESIGN.md) is awaiting review/implementation.
-Do not enable registration using today's source; it has no invitation check.
+[invitation implementation](backend/INVITATIONS.md) is ready for local code
+review, not deployment. Operator issuance/delivery tooling and hosted acceptance
+are outstanding. Do not enable registration until those release gates and
+Paul's approval are satisfied. Pending migrations now include 0004.
 All account-test steps below are conditional on that gate being implemented,
 verified and separately approved for deployment.
 

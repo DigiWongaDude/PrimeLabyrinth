@@ -5,9 +5,10 @@ Paul runs deployments. Both `ACCOUNTS_ENABLED` and `REGISTRATION_ENABLED` remain
 `false` in committed configurations; `g5-config.js` remains blank.
 
 **2026-10-19 decision:** Paul selected invitation-only registration. The
-[security design and test matrix](G5-INVITATION-DESIGN.md) are proposals awaiting
-review/implementation. Existing code still permits ungated signup when enabled;
-keep registration closed until the new API/database gate passes review.
+[security design and test matrix](G5-INVITATION-DESIGN.md) now have a local API,
+migration 0004 and manual-input implementation; see [contract](backend/INVITATIONS.md).
+Operator issuance tooling and hosted validation remain pending. Keep registration
+closed until independent review and Paul's explicit deployment approval.
 
 ## Identity and privacy contract
 
@@ -155,10 +156,12 @@ preview origin and Google configuration above are settled.
    source-built bundle contains Sara's Minotaur URL and exact `GET /` handler.
 2. Back up/export staging D1 to a private location first; never commit the export.
    Record table counts and immutable discovery ownership before migration.
-3. Paul applies only `0003_accounts.sql` through the migration runner:
+3. After review, Paul applies the pending additive migrations through the runner,
+   including `0003_accounts.sql` (if not already applied) and `0004_invitations.sql`:
    `npx wrangler d1 migrations apply between-g5-staging --remote --config wrangler.staging.jsonc`.
    Confirm `foreign_key_check`, unchanged visits/discoveries/commands, one profile
-   per traveller, unique public IDs and initial empty accounts/sessions.
+   per traveller, unique public IDs, expected account/session counts and the
+   migration-time legacy eligibility snapshot. Do not reset existing accounts.
 4. Dry-run with staging config, then Paul deploys the reviewed Worker:
    `npx wrangler deploy --config wrangler.staging.jsonc`.
    Keep the two enablement flags false for the initial migration/deployment check.
@@ -169,8 +172,9 @@ preview origin and Google configuration above are settled.
    an empty archive and closed flags; do not run it unchanged after invited visits.
 6. Only after the invitation gate is implemented, reviewed and approved by Paul
    for deployment, test two devices and two travellers reaching the same path,
-   account upgrade, Google linking and discovery privacy. The current code has
-   no invitation gate; frontend Access does not close the API. Use the new
+   account upgrade, Google linking and discovery privacy. The local source has
+   an invitation gate; deployment is still unapproved. Frontend Access is not
+   a substitute for API enforcement. Use the new
    invitation acceptance matrix and close registration after the test window.
 
 Rollback: disable new registrations/accounts, retain D1 and all immutable history.

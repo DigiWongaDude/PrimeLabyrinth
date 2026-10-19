@@ -75,7 +75,7 @@ read-only archive endpoint is internet-accessible with an allowed Origin header.
 
 This is not a hosted two-device recovery test. The existing 36 local tests and
 local journey smoke checks cover saves/atomicity; controlled hosted account
-journey testing is the next separate acceptance gate. The current backend has
+journey testing is the next separate acceptance gate. The previously deployed backend has
 no invitation gate when registration is enabled.
 
 ## Boundaries and rollback
@@ -94,9 +94,11 @@ Future staging code can be restored from the commit/config above, after review.
 
 Next approval needed: a confirmed isolated frontend-preview origin and a
 controlled account-testing window. Only then connect a preview and verify a
-private recovery code across two real devices. The current backend does not
+private recovery code across two real devices. The previously deployed backend does not
 enforce invited-only password registration. Paul subsequently selected a backend
 invitation gate; see `G5-INVITATION-DESIGN.md`. Keep registration closed pending
-its implementation and review. Frontend Access cannot protect direct API signup.
+its review and approved rollout. Local implementation is now described in
+`backend/INVITATIONS.md`; operator tooling and hosted tests remain outstanding.
+Frontend Access cannot protect direct API signup.
 No further work under issue #36 is needed unless a reviewer identifies a failed
 acceptance item.

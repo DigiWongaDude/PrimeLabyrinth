@@ -7,8 +7,9 @@ perform any dashboard action and approve the selected option.
 
 **Decision update, 2026-10-19:** Paul selected Option D, invitation-only
 registration. See [invitation security design](G5-INVITATION-DESIGN.md) for the
-review proposal and acceptance tests. The gate is not yet implemented; do not
-enable registration in the current code. Option B below is historical and is
+review proposal and acceptance tests. The API/database gate and manual input are
+locally implemented; operator tooling and independent/hosted review are pending.
+Do not enable registration yet. Option B below is historical and is
 not authorised for this alpha.
 
 ## What the current implementation actually enforces
@@ -23,8 +24,9 @@ not authorised for this alpha.
 - Google login returns to the frontend page with `code` and `state`; the page
   removes them from the URL and POSTs them to `/v1/auth/google/complete`. The
   redirect URI must be the exact page origin/path accepted by the Worker.
-- `REGISTRATION_ENABLED=true` is open signup for any client that can reach the
-  API. There is no invite token, email allowlist, or backend tester gate.
+- The updated source requires an invitation for new password/Google accounts
+  when `REGISTRATION_ENABLED=true`. This is local code, not a live-deployment
+  claim. Earlier deployed versions may still have ungated signup if enabled.
 - `GET /` is intentionally outside the Origin guard and must continue to serve
   the Minotaur entrance. Protecting or changing it is not part of this test.
 
@@ -35,7 +37,7 @@ not authorised for this alpha.
 | A. Closed staging | Pages preview public or Access-protected | API public but `ACCOUNTS_ENABLED=false` | Yes; no account creation | **Safe baseline** |
 | B. Short open test | Pages preview optionally Access-protected | API reachable; temporarily enable accounts/registration | Yes | **Not selected; do not use for this alpha** |
 | C. Access on both | Pages + Worker Access | Access in front of API | No: current `credentials:'omit'` client cannot use Access cookies/redirects | **Do not choose without Astra/security redesign** |
-| D. Backend invite gate | Pages preview + normal bearer API | Worker rejects new registration unless an invitation is redeemed | Compatible with existing transport | **Selected by Paul; design review pending, not implemented** |
+| D. Backend invite gate | Pages preview + normal bearer API | Worker rejects new registration unless an invitation is redeemed | Compatible with existing transport | **Selected; local implementation awaiting independent review and operator tooling** |
 
 Use A for closed baseline checks, then D only after implementation, independent
 review and Paul's deployment approval. The invitation is a privately delivered

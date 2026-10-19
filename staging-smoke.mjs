@@ -21,9 +21,9 @@ await check('private journey requires credential','/v1/journey',{},401,{error:'c
 await check('unapproved frontend rejected','/v1/health',{origin:'https://digiwongadude.com'},403,{error:'origin_not_allowed'});
 await check('missing origin rejected','/v1/health',{origin:''},403,{error:'origin_not_allowed'});
 const token=Array.from(crypto.getRandomValues(new Uint8Array(32)),x=>x.toString(16).padStart(2,'0')).join('');
-await check('registration closed','/v1/travellers',{
+await check('unknown legacy credential cannot register','/v1/travellers',{
   method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:{}
-},403,{error:'registration_closed'});
+},403,{error:'use_account_signup'});
 await check('no discoveries created by probes','/v1/exploration',{},200,{
   totalLocations:0,uniqueTriples:0,contributors:0,contributions:0,recentDiscoveries:[]
 });

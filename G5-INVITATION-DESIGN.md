@@ -1,11 +1,11 @@
 # G5 invitation-only alpha: security design for Sara review
 
-Status: design direction approved by Sara; a **schema-only review candidate** and
-21 executable local D1 tests now exist in `backend/invitation-candidate` and
-`backend/invitation-schema.test.ts`. The candidate is excluded from deployable
-migrations. API enforcement, frontend and operator tooling are **not implemented**.
-See [schema checkpoint](backend/invitation-candidate/README.md) for its transaction
-contract and the proposed transactional legacy-proof addition. Original source reviewed:
+Status: design direction approved by Sara; migration 0004, API enforcement and
+manual frontend invitation input are now **locally implemented for review**.
+21 schema and 14 invitation-route tests exist; the route tests use locally signed
+OIDC tokens, not live Google. Operator tooling and hosted validation are pending.
+See [implementation contract](backend/INVITATIONS.md) for the transaction/proof
+mechanism and release gates. Nothing is deployed. Original source reviewed:
 `f40c66359f14ef8a516c92a820dfb5db4a0d9c49`, `codex/g5-persistence`.
 Paul approved invitation-only registration in the shared notes. This replaces
 the earlier recommendation for a short open-registration window. The public
@@ -27,7 +27,7 @@ not prove the recipient's real-world identity or prevent forwarding. Named-perso
 verification would require a different design. An invitation never authenticates
 an existing traveller or grants access to their history.
 
-## Findings in the actual source
+## Historical findings in the original source (before invitation implementation)
 
 - `backend/accounts.ts:registration` checks a boolean flag and traveller cap;
   it does not check an invitation. `createAccount` currently accepts both new
@@ -97,8 +97,8 @@ an account preserves the spent invitation and discovery ledger.
 
 ## Proposed additive D1 changes and atomicity
 
-Reserve migration `0004_invitations.sql` for the later implementation; no SQL
-migration file is added by this review. Proposed records:
+Migration `backend/migrations/0004_invitations.sql` now implements these records
+plus transactional `legacy_upgrade_proofs` (see implementation contract):
 
 - `invitations`: unique random ID, unique token digest, integer creation/expiry
   times, nullable revocation time; constraints enforce the timestamp bounds.
@@ -213,9 +213,10 @@ tokens, SQL bindings or provider payloads. Do not key unbounded counters on ever
 random guessed invitation. Keep the traveller cap and budget alerts; small
 alpha issuance bounds growth, but rate limits/alerts are not a spending ceiling.
 
-## Acceptance tests to write before implementation
+## Acceptance specifications and coverage tracking
 
-These are specifications, not executed tests. Put security cases in the Workers
+The table remains specifications, not a claim that every item has been proven.
+See the implementation contract/shared notes for executed coverage. Put security cases in the Workers
 test runtime using migrations and isolated fixtures; never mock away transaction
 semantics. Existing fixtures that create legacy users through the public endpoint
 must instead seed pre-migration users, then apply 0004. Do not retain an HTTP
@@ -259,9 +260,9 @@ local migration/tests and backend checks, followed by the frontend field and
 operator utility. Require local migration, race/failure tests, existing suites,
 typecheck and both dry-runs before declaring implementation ready.
 
-No invitation has been minted or database migrated by this design review. Current
-code still permits ungated signup if enabled. Keep registration disabled until
-the gate is implemented and independently reviewed. After a future deployment,
+Only disposable local test invitations and test-database migrations have been
+used. Keep registration disabled until the implementation is independently
+reviewed and operator tooling/hosted acceptance are ready. After a future deployment,
 rollback must keep registration closed and never restore an open-signup version
 with registration true. Do not roll back by dropping invitation/discovery data.
 
