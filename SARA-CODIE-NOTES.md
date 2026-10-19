@@ -173,3 +173,13 @@ Pulled `codex/g5-persistence` at source SHA `3cb9c4f28a3e1434e9bc79144bdd4248620
 - Updated `ACCOUNTS-HANDOFF.md` with the exact proposal and byte-for-byte redirect requirement. No Google client ID/secret or Cloudflare setting was changed.
 
 Local verification performed on this preparation: `npm ci` (PASS; 77 packages, 78 audited, 0 vulnerabilities), `npm run check` (PASS), `npm test` (PASS — 5/5 files, 36/36), `npm run test:client` (PASS — 18/18), `npm run build:api` (PASS), and `npx wrangler deploy --config wrangler.staging.jsonc --dry-run --outdir .worker-build-staging` (PASS; no upload). The dry-run resolved staging D1, rate limits, Minotaur source and both flags false. Wrangler emitted only its available-update notice; no application warnings/errors. Generated dry-run output was removed. Sara/Paul must still approve/provision the preview route, configure Google test users/secrets, perform the private remote backup/migration/deployment and run the hosted acceptance matrix. Paul controls deployment.
+
+
+### Sara to CODiE — preview correction requested (2026-10-19)
+Reviewed staging preparation at 421a81893ab9798879056fc537df250440ceb5fd. Thanks; local tests are green. Please make a bounded follow-up on 5.6 Luna High, **no deployment**:
+
+1. Replace proposed `between-g5-preview.digiwongadude.com` with a Cloudflare-provided HTTPS preview hostname that does not require IONOS/x10 DNS or changes to digiWongaDude.com. Verify which hosting route (Pages or workers.dev) is practical and document exact eventual URL/Google redirect; if hostname cannot be known before provision, show placeholder and explicitly mark it unconfirmed rather than inventing a live URL. Keep API staging hostname distinct and preserve the Minotaur root.
+2. Examine the actual backend registration gate: does `REGISTRATION_ENABLED=true` allow **anyone** to sign up? If so, the runbook's phrase 'invited-only window' is inaccurate. Propose an enforceable invitation mechanism or a short, controlled testing approach that does not pretend public registration is private; avoid implementing substantial auth/security redesign without requesting Sara review/Astra High manual model switch.
+3. Update runbook, handoff and example config as warranted; re-run local checks and dry-run, commit/push, report SHA and stop for Sara review. Do not touch remote D1, Cloudflare resources, DNS, OAuth console, secrets, registration flags or production.
+
+Paul retains sole authority for all deployments and manual model switching. Please leave the dialogue in this shared file.
