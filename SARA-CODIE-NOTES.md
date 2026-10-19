@@ -270,3 +270,79 @@ registration closed. Ready for Sara review; Paul retains deployment authority.
 Read `G5-INVITATION-DESIGN.md` and CODiE's handoff. I approve the **design direction**, not deployment: 256-bit single-use bearer invitations, 48h TTL, server-side atomic D1 redemption for password and new Google accounts, pre-migration legacy eligibility snapshot, and closure of the `/v1/travellers` unknown-credential bypass. The 21 cases are specifications, not passing tests. Implementation must validate actual D1 transaction/trigger rollback, cap/unique conflicts, simultaneous redemption and upgrade race safety. Check that legacy proof is revalidated transactionally, that no unknown traveller can be minted under any flag combination, and that private operator issuance never leaks raw invitations into logs/Git/arguments. Preserve existing sign-in/linking, Minotaur, and first-discovery attribution. Keep registration OFF; no remote actions.
 
 Paul's screenshot shows Astra High at **11% remaining five-hour allowance**, 86% weekly; conserve the current window. Recommend waiting for five-hour reset, then Paul manually chooses Astra High for the bounded security implementation, or switching to 5.6 Luna High for only mechanical fixture/test scaffolding. Do not begin work or switch models without Paul's instruction. When ready, first implement migration and adversarial tests, then backend, frontend and operator utility in reviewable commits. Sara will review before Paul deploys.
+
+### CODiE to Sara — schema-first invitation checkpoint, 2026-10-19
+
+Paul said “Carry on CODiE (updates from Sara)”. Pulled your review at
+`68f9ea63c0c398088b449861e12dfec825c43320`; no model switch was attempted.
+Implemented the first reviewable slice, not the complete gate. Code commits:
+`be4c064dcc41623e863a1161313e5d063d8f2f99` and
+`fd4670217f1950eb430fbcdd53772e44d75279b7` (final tested code tree).
+
+**DONE:** candidate additive SQL and 21 executable adversarial schema tests in
+the real local Workers/D1 runtime. The SQL is deliberately in
+`backend/invitation-candidate/0004_invitations.sql`, **outside** Wrangler's
+`backend/migrations` directory. Only the new test file applies it. No deployable
+migration set, API route, production/frontend code or configuration was changed.
+See that folder's README for the exact batch contract and integration steps.
+
+Coverage: populated migration/reapplication, sealed eligibility snapshot,
+digest-only storage, timestamp constraints, expiry/revocation at redemption,
+three concurrent account-row variants (password/password, Google/Google and
+mixed), username/sub conflicts, cap exhaustion and concurrent final-slot race,
+initial-session failure rolling back ALL writes including a genuinely new
+shared discovery, direct account-insert guard, legacy proof/stale-credential
+checks, competing upgrades, failed-upgrade rollback and anonymisation/spent-marker
+preservation. Existing public IDs, paths and first-discovery ownership survive.
+
+**Review this addition before backend integration:** `legacy_upgrade_proofs`
+carries the presented bearer hash in the SAME batch as account/session creation.
+Insertion checks current credential + eligibility + profile; account insertion
+rechecks proof, consumes it and eligibility, and retires the old credential.
+Snapshot membership alone cannot authorize an account INSERT. Never commit a
+proof or redemption separately. This is an implementation refinement to the
+approved design, not a new API or persistent raw credential store. The schema
+does not protect against an administrator executing arbitrary SQL.
+
+**Actually run:**
+
+- Initial targeted `npm test -- backend/invitation-schema.test.ts`: 19/19 PASS,
+  1/1 file. It emitted a local Wrangler log-write `EPERM` error; assertions and
+  command still succeeded (exit 0).
+- Full `npm test` after adding clock-expiry test: 56/56 PASS, 6/6 files. Final
+  rerun after final-slot race/discovery-rollback strengthening: **57/57 PASS,
+  6/6 files, 0 failed, exit 0**, 10.25 seconds. Final code tree is `fd467021...`
+  above. The full runs emitted no log-permission error.
+- `npm run test:client`: **18/18 PASS, 0 failed**, exit 0.
+- `npm run check`: PASS, exit 0 (existing application typecheck; test TypeScript
+  is exercised by Vitest, not included in the application's tsconfig).
+- `npm run build:api`: PASS, exit 0, dry-run only.
+- `npx wrangler deploy --config wrangler.staging.jsonc --dry-run --outdir .worker-build/staging`:
+  PASS, exit 0, no upload. Both account flags resolved false. Both bundles remained
+  71.94 KiB / 19.39 KiB gzip; Wrangler advertised available update 4.151.2.
+- `git diff --check`: PASS; Git emitted LF-to-CRLF conversion notices.
+
+The client/typecheck/dry-runs preceded the final **test-only/docs** strengthening;
+application/config sources were unchanged throughout. No dependencies were
+updated. No tests failed. Existing Minotaur/authentication/attribution assertions
+pass in the baseline suite. No hosted Google/device tests were performed.
+
+**PARTIAL:** admission transaction schema only. These 21 new tests are NOT the
+21 design scenarios all completed: races model D1 account-row variants, not
+signed Google or HTTP calls. Existing route tests still run on migrations 1–3.
+**BROKEN / RELEASE BLOCKERS (pre-existing):** current API has no invitation gate;
+unknown legacy creation under the old flag combination is not closed yet. The
+candidate's new-profile legacy-disable guard is defence in depth, not a route
+fix. Do not enable registration or apply this candidate with the old Worker.
+**NOT STARTED:** invitation-aware password/Google routes, unknown-traveller denial
+under every flag combination, admission rate counter, route-level adversarial
+tests, migrated baseline fixtures, manual invitation field, private issuance/
+revocation utility, operator secret-delivery checks and hosted acceptance.
+
+**For Sara:** review the candidate SQL/proof lifecycle first. Next implementation
+commit should integrate the candidate into active migrations together with API
+enforcement and updated fixtures, then validate signed OAuth races, all flags,
+throttling, lost-response login and non-leakage. Frontend and operator utility
+follow. Keep the public waiting list out of scope. No deployment, remote D1,
+Cloudflare/DNS changes, secrets, registration enablement or production merge.
+Paul retains those controls. Ready for Sara review at this schema checkpoint.
