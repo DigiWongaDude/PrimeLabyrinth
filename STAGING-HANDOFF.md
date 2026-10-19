@@ -95,6 +95,8 @@ Future staging code can be restored from the commit/config above, after review.
 Next approval needed: a confirmed isolated frontend-preview origin and a
 controlled account-testing window. Only then connect a preview and verify a
 private recovery code across two real devices. The current backend does not
-enforce invited-only password registration; use an approved access policy or a
-short monitored window. No further work under issue #36 is needed unless a
-reviewer identifies a failed acceptance item.
+enforce invited-only password registration. Paul subsequently selected a backend
+invitation gate; see `G5-INVITATION-DESIGN.md`. Keep registration closed pending
+its implementation and review. Frontend Access cannot protect direct API signup.
+No further work under issue #36 is needed unless a reviewer identifies a failed
+acceptance item.

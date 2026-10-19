@@ -4,6 +4,11 @@ Implementation for review on `codex/g5-persistence` / draft PR #35. **Not deploy
 Paul runs deployments. Both `ACCOUNTS_ENABLED` and `REGISTRATION_ENABLED` remain
 `false` in committed configurations; `g5-config.js` remains blank.
 
+**2026-10-19 decision:** Paul selected invitation-only registration. The
+[security design and test matrix](G5-INVITATION-DESIGN.md) are proposals awaiting
+review/implementation. Existing code still permits ungated signup when enabled;
+keep registration closed until the new API/database gate passes review.
+
 ## Identity and privacy contract
 
 - A traveller keeps the same internal ID, private history, active path and discovery
@@ -162,12 +167,11 @@ preview origin and Google configuration above are settled.
 5. Verify Minotaur root, unauthorized `/v1/` denial, health, private-journey denial,
    closed registration, and actual stored counts. `staging-smoke.mjs` still assumes
    an empty archive and closed flags; do not run it unchanged after invited visits.
-6. Only after Paul approves a controlled account test window, test two devices
-   and two travellers reaching the same path, account upgrade, Google linking
-   and discovery privacy. `REGISTRATION_ENABLED=true` is open registration to
-   any client that can reach the endpoint; the current code has no invitation
-   gate. Use Cloudflare Access/WAF or a short, monitored window if private
-   testing is required, and close registration afterward.
+6. Only after the invitation gate is implemented, reviewed and approved by Paul
+   for deployment, test two devices and two travellers reaching the same path,
+   account upgrade, Google linking and discovery privacy. The current code has
+   no invitation gate; frontend Access does not close the API. Use the new
+   invitation acceptance matrix and close registration after the test window.
 
 Rollback: disable new registrations/accounts, retain D1 and all immutable history.
 Restore a reviewed compatible Worker version if needed. Do not undo the additive

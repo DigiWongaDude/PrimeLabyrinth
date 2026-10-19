@@ -4,6 +4,12 @@ This is a manual, review-first runbook for the isolated G5 staging test. It is
 not an instruction to deploy. Paul controls every deployment, remote migration,
 secret upload, Cloudflare setting change and registration enablement.
 
+**Admission gate:** Paul selected invitation-only alpha registration. The
+[invitation design](G5-INVITATION-DESIGN.md) is awaiting review/implementation.
+Do not enable registration using today's source; it has no invitation check.
+All account-test steps below are conditional on that gate being implemented,
+verified and separately approved for deployment.
+
 ## Proposed isolated origins
 
 | Purpose | Exact value |
@@ -46,9 +52,11 @@ origin with a path, trailing slash, query, or fragment is not an OAuth origin.
    npx wrangler d1 migrations list between-g5-staging --remote --config wrangler.staging.jsonc
    ```
 
-   Record the backup checksum, UTC time, row counts for `travellers`, `visits`,
-   `discoveries`, `commands`, `accounts`, `profiles`, `sessions` and
-   `oauth_attempts`, plus `PRAGMA foreign_key_check;`. Keep the backup until the
+   Record the backup checksum, UTC time, migration list and row counts for
+   tables that exist: `travellers`, `visits`, `discoveries`, `commands`, and
+   any account/invitation tables already migrated, plus
+   `PRAGMA foreign_key_check;`. Record not-yet-created tables as absent rather
+   than querying them. Keep the backup until the
    invited test and rollback window are closed.
 
 ## B. Google Cloud configuration (Paul/Sara, no secrets in Git)
@@ -98,24 +106,27 @@ Before the deploy, verify the source dry-run has resolved the staging D1,
   `https://digiwongadude.com/between/assets/minotaur-access-denied.png` URL.
 - Allowed-origin `GET /v1/health` returns G5 health; missing/foreign origins
   are denied; `GET /v1/auth/config` is `503 accounts_disabled`.
-- Registration attempts remain `403 registration_closed` (or the existing
-  closed-registration response) and no test identity is written.
-- D1 foreign-key check and the pre-migration row-count record still match.
+- Account signup returns `503 accounts_disabled` while accounts are off; once
+  accounts are on and registration remains off, signup returns
+  `403 registration_closed`. No probe creates an identity.
+- D1 foreign-key checks remain clean and existing ledger rows match the
+  pre-migration snapshot. New profile/eligibility backfills must match their
+  migration specification; do not expect every table count to be unchanged.
 
 ## D. Invited account test window
 
-After smoke checks pass, Paul may explicitly enable a short, controlled account
-test window and records the exact Worker version and vars. **This is not an
-invited-only gate:** `REGISTRATION_ENABLED=true` permits any client that can
-reach the API to sign up; the current backend has no invitation mechanism.
-For private testing, put the preview behind an approved Cloudflare Access/WAF
-policy or use a closely monitored window with disposable credentials. Named
-Google test users restrict Google's provider audience but do not restrict
-password signup. Close registration again when this checklist is complete.
+After the invitation implementation passes review and closed smoke checks,
+Paul may approve deployment and invitation redemption. Record the exact Worker
+version and flags. Use privately issued disposable invitations for new password
+and Google accounts. The backend must reject direct API signup without a valid
+invitation even when the caller supplies an allowed Origin. Frontend Access
+alone cannot provide this guarantee, and Google test users do not gate password
+signup. Keep registration closed until the code and migration provide this
+enforcement; close it again at the end of testing.
 
 ### Password account
 
-1. During the controlled open-registration window, sign up with a 15+ character disposable password; save the one-time recovery
+1. Redeem a disposable invitation with a 15+ character password; save the one-time recovery
    key privately. Confirm the returned profile has a stable public ID.
 2. Log in successfully, log in with the wrong password, try a nonexistent
    username, and confirm failures are generic and rate limits engage.
@@ -131,11 +142,11 @@ password signup. Close registration again when this checklist is complete.
 
 1. Start Google login from the confirmed Pages preview. Verify state, nonce, S256 PKCE and the
    exact redirect return to `/index.html`; test cancel, expiry and replay.
-2. Sign in with a named Google test user and confirm a new account is created
-   only while the controlled window is open. Repeat on a second device and confirm
-   the same Google `sub` resumes the same traveller.
-3. Create a password account, sign in recently, choose **Keep this traveller
-   and add Google login**, and complete the real Google flow. Confirm the
+2. Sign in with a named Google test user and confirm a new account requires
+   registration open and a valid invitation. Repeat on a second device without
+   an invitation and confirm the same Google `sub` resumes the same traveller.
+3. Create a password account, sign in recently, choose **Link Google account**,
+   and complete the real Google flow. Confirm the
    traveller ID/history/public ID are unchanged.
 4. Attempt to link that Google identity to a different password traveller;
    confirm `identity_already_linked` and no merge. Confirm equal email with a
@@ -143,6 +154,10 @@ password signup. Close registration again when this checklist is complete.
 5. Log out the initiating account before the callback and confirm linking fails
    without attaching the Google subject. Confirm no provider token, secret,
    username or internal traveller ID appears in public discovery responses.
+6. Separately test an existing legacy traveller with **Keep this traveller and
+   add Google login**; that button upgrades a legacy identity, not a password
+   account. Check the migration eligibility and continuity contract in the
+   invitation design.
 
 ### Shared discovery attribution
 
@@ -163,6 +178,8 @@ password signup. Close registration again when this checklist is complete.
 2. Restore the last reviewed compatible Worker version from the Cloudflare
    version list/dashboard. A pre-accounts Worker cannot authenticate upgraded
    travellers, so prefer a forward fix; never roll back by deleting D1 tables.
+   Keep registration closed on rollback; never restore a pre-invitation version
+   with registration enabled. Preserve spent-invitation records.
 3. Use the private D1 export only for a separately approved data-recovery plan
    after identifying corruption. Preserve the immutable exploration ledger.
 4. Re-run the Minotaur, health, origin, closed-registration and foreign-key

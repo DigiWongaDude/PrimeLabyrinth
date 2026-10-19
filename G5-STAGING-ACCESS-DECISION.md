@@ -5,6 +5,12 @@ smallest safe way to test password accounts and real Google sign-in without
 changing production, DNS, remote D1, Cloudflare settings or secrets. Paul must
 perform any dashboard action and approve the selected option.
 
+**Decision update, 2026-10-19:** Paul selected Option D, invitation-only
+registration. See [invitation security design](G5-INVITATION-DESIGN.md) for the
+review proposal and acceptance tests. The gate is not yet implemented; do not
+enable registration in the current code. Option B below is historical and is
+not authorised for this alpha.
+
 ## What the current implementation actually enforces
 
 - The Worker checks the request `Origin` against `ALLOWED_ORIGINS` for every
@@ -27,21 +33,23 @@ perform any dashboard action and approve the selected option.
 | Option | Frontend | API | Browser-compatible now? | Decision |
 | --- | --- | --- | --- | --- |
 | A. Closed staging | Pages preview public or Access-protected | API public but `ACCOUNTS_ENABLED=false` | Yes; no account creation | **Safe baseline** |
-| B. Short open test | Pages preview optionally Access-protected | API reachable; temporarily enable accounts/registration | Yes | **Smallest no-code account test**, but not private/invite-only |
+| B. Short open test | Pages preview optionally Access-protected | API reachable; temporarily enable accounts/registration | Yes | **Not selected; do not use for this alpha** |
 | C. Access on both | Pages + Worker Access | Access in front of API | No: current `credentials:'omit'` client cannot use Access cookies/redirects | **Do not choose without Astra/security redesign** |
-| D. Backend invite gate | Pages preview + normal bearer API | Worker rejects signup unless a server-held invite is valid | Yes | Strongest private test, but new auth design/migration; request Astra before implementation |
+| D. Backend invite gate | Pages preview + normal bearer API | Worker rejects new registration unless an invitation is redeemed | Compatible with existing transport | **Selected by Paul; design review pending, not implemented** |
 
-Recommended sequence: A for the initial deployment and Minotaur/API smoke
-tests; then B only if Paul accepts a brief public staging signup window with a
-small `MAX_TRAVELLERS` cap, monitoring and immediate shutdown. Choose D instead
-if “only these named testers” is a hard requirement. Do not describe B as
-invited-only. Do not choose C by merely placing Access in front of the API.
+Use A for closed baseline checks, then D only after implementation, independent
+review and Paul's deployment approval. The invitation is a privately delivered
+bearer credential, not proof of a named person's identity. Frontend Access does
+not protect direct API requests. No public-registration window is planned.
 
 ## Cloudflare dashboard checklist (Paul only)
 
 1. Create a Pages project from `DigiWongaDude/PrimeLabyrinth` named
-   `between-g5-preview`, with the static repository root as the output and the
-   `codex/g5-persistence` branch as the preview branch. No custom domain is
+   `between-g5-preview`, with a dedicated static artifact as output and the
+   `codex/g5-persistence` branch as the preview branch. Package only
+   `index.html`, `style.css`, `app.js`, `engine.js`, `view.js`, `journey-client.js`,
+   `account-client.js` and the preview copy of `g5-config.js`; never publish the
+   repository root, SQL/backups, notes, tests or operator utilities. No custom domain is
    needed. Cloudflare's branch alias is expected to be
    `https://codex-g5-persistence.between-g5-preview.pages.dev`, but this remains
    **unconfirmed until the project/deployment exists**.
@@ -73,6 +81,8 @@ invited-only. Do not choose C by merely placing Access in front of the API.
 
 ### B — controlled open window
 
+Historical comparison only: Paul selected D. Do not execute this option.
+
 - Before opening: private D1 backup, exact Worker SHA/version, flags and cap
   recorded; Pages/API origins and Google redirect are confirmed.
 - Use disposable password credentials and named Google test users. Run signup,
@@ -88,9 +98,8 @@ invited-only. Do not choose C by merely placing Access in front of the API.
 ### C/D gate
 
 Do not begin implementation or claim private testing until Sara reviews the
-security design. A backend invite gate must define token creation, storage,
-expiry, one-use semantics, rate limits, audit/discovery ownership and recovery
-behavior. An Access-based API design must define browser credentials, CORS with
+security design. The proposed backend invitation gate is now specified in
+[G5-INVITATION-DESIGN.md](G5-INVITATION-DESIGN.md). An Access-based API design must define browser credentials, CORS with
 credentials, CSRF protection, OAuth callback behavior and failure handling.
 
 ## Local validation available now

@@ -213,3 +213,54 @@ Reviewed `G5-STAGING-ACCESS-DECISION.md`. Agreed: CORS Origin is not authenticat
 
 ### Paul — invitation-only alpha decision (2026-10-19)
 Paul approves invitation-only account registration for THE BETWEEN. A public invitation-request waiting list may come later as a way to measure interest, but it is not part of the current task. Keep those flows separate. The immediate next step is an Astra High security design review for invitations covering password signup and new Google identities, while preserving existing logins and account linking. CODiE must wait for Paul to manually select Astra High and say 'Carry on CODiE' before starting. No deployment, remote database migration, Cloudflare changes, public registration or production merge is authorised.
+
+### CODiE to Sara — invitation design review, 2026-10-19
+
+Paul resumed with “Carry on CODiE” after a model-switch event. No automatic
+model switch was attempted; the exact UI model/effort label is not available to
+this session. Pulled/reviewed source `f40c66359f14ef8a516c92a820dfb5db4a0d9c49`.
+Added `G5-INVITATION-DESIGN.md` as a design proposal with 21 acceptance scenarios;
+no invitation implementation or migration was added.
+
+**Recommendation:** API-enforced, randomly issued 256-bit bearer invitations,
+digest-only storage, expiring/revocable and redeemable exactly once. Password
+signup and new verified Google subjects must commit invitation redemption,
+account/profile/traveller, ROOT visit and initial session in one D1 transaction.
+Existing sign-in/link/recovery stays invitation-free. Privately delivered bearer
+invitations are transferable; they do not prove a named recipient's identity.
+No new subscription, Access-cookie integration or waiting list is proposed.
+
+**Additional bypass found in source:** `/v1/travellers` can mint new legacy
+travellers if accounts are off and registration is on. The proposed release
+must reject unknown credentials there under every flag combination. Preserve
+real existing upgrades with a migration-time eligibility snapshot and
+credential recheck inside the upgrade transaction. Database admission guards
+and unique redemption rows prevent unchecked account creation or concurrent
+double-spend; these are proposed, not runtime-proven yet.
+
+Updated the decision/runbook/handoffs to reflect Paul's choice of Option D,
+remove open-window/Pages-only protection advice from the current recommendation,
+require backend gate readiness before enablement, and specify an allowlisted
+frontend artifact rather than publishing the repository root. Corrected the
+password-account linking test to use **Link Google account**; the “Keep this
+traveller” button is a distinct legacy migration flow. Source config, application
+code, engine, Minotaur handler and deployed resources were not changed.
+
+**Actually run:** `npm test -- backend/accounts.test.ts` on the unchanged source
+above: PASS, 1/1 file, 17/17 tests, 0 test failures, exit 0. Wrangler emitted
+`EPERM` writing its local log at
+`.../xdg.config/.wrangler/logs/wrangler-2026-10-19_13-03-03_526.log`; assertions
+still completed. `git diff --check` passed (Git emitted LF-to-CRLF conversion
+notices). This verifies the existing baseline only. New invitation scenarios,
+SQL triggers/races, full suites, typecheck, dry-runs and real Google/remote
+checks were not run for this documentation-only change. Earlier 36/36 and
+18/18 results are historical, not new invitation validation.
+
+**DONE:** source threat review, proposed token/route/transaction lifecycle,
+failure and retry policy, acceptance matrix, reconciled deployment guidance.
+**NOT STARTED:** migration 0004, admission guards, frontend invitation input,
+operator issuance utility, executable invitation tests or deployment.
+**For Sara:** review/accept the bearer scope, 48-hour TTL (seven-day maximum),
+legacy snapshot, SQL guard ordering and proposed D1 per-IP admission limit
+before implementation. The current code still has no invitation gate; leave
+registration closed. Ready for Sara review; Paul retains deployment authority.
