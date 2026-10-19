@@ -98,13 +98,15 @@ explicit and requires a recently authenticated account and the completed Google
 flow, tied to the same session. A Google identity already owned by a different
 traveller is rejected. We never automatically merge histories.
 
-1. Choose/approve an isolated HTTPS frontend preview URL. Keep G1–G4's production
-   site unchanged. Put its exact origin in the staging `ALLOWED_ORIGINS` list.
+1. Approve the isolated HTTPS frontend preview proposed by this preparation:
+   `https://between-g5-preview.digiwongadude.com`. Keep G1–G4's production site
+   unchanged. Its exact origin is now listed in the *source* staging
+   `ALLOWED_ORIGINS`; no Cloudflare setting or DNS record has been changed.
 2. In Paul's Google Cloud project, configure OAuth consent and a **Web application**
    OAuth client. While testing, restrict audience to named test users.
-3. Set its authorised redirect URI to the exact preview page, e.g. the actual
-   `https://<approved-preview-host>/index.html` (no query or fragment). The actual
-   value must match `GOOGLE_REDIRECT_URI` byte-for-byte. Approve its JavaScript
+3. Set its authorised redirect URI to the exact preview page:
+   `https://between-g5-preview.digiwongadude.com/index.html` (no query or
+   fragment). The value must match `GOOGLE_REDIRECT_URI` byte-for-byte. Approve its JavaScript
    origin as appropriate. Only `openid email` scopes are requested.
 4. Set public `GOOGLE_CLIENT_ID` and `GOOGLE_REDIRECT_URI` in the staging config.
    Store `GOOGLE_CLIENT_SECRET` through Cloudflare's secret UI or

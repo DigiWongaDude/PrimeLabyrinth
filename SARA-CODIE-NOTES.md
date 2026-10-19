@@ -160,3 +160,16 @@ The backend regression run reported by CODiE after Sara's fix: **36/36 passing**
 
 ### Paul decision — Workers Paid approved, strict cost discipline (2026-10-19)
 Paul has decided to pay for Cloudflare Workers Paid (base US$5/month) to keep authentication and backend together, with headroom. **Paul alone performs the plan upgrade/purchase.** Target total monthly Cloudflare spend **at or below GBP 10**, approximately GBP 5 extra usage budget, **not** approval for uncapped spend. Cloudflare budget alerts are projected-spend notifications, NOT hard caps. Do not claim the platform guarantees a GBP 10 cap; verify all relevant charges (Workers, D1, other metered services), tax and currency conversion. Before Paul upgrades, prepare read-only cost-control recommendations: budget alerts, per-request CPU limits, rate limiting, anti-abuse and observability, with specific Cloudflare-supported mechanisms and limits. No configuration changes, deployments or purchases without Paul authorisation. Do not weaken scrypt parameters. Benchmark remains useful for latency/cost even with Paid plan.
+
+### CODiE — 2026-10-19, G5 staging preparation (Ready for Sara review)
+
+Pulled `codex/g5-persistence` at source SHA `3cb9c4f28a3e1434e9bc79144bdd4248620e808f`. Prepared, but did not deploy, migrate, provision, or change Cloudflare/DNS:
+
+- Proposed isolated frontend: `https://between-g5-preview.digiwongadude.com`.
+- Exact Google OAuth redirect URI: `https://between-g5-preview.digiwongadude.com/index.html`.
+- Added `g5-config.staging.example.js`; it points only to the existing staging API and is not the production `g5-config.js`.
+- Added the proposed preview origin to the **source** `wrangler.staging.jsonc` allowlist while retaining the API origin; staging flags remain `ACCOUNTS_ENABLED=false` and `REGISTRATION_ENABLED=false`.
+- Added `G5-STAGING-ACCOUNTS-RUNBOOK.md` covering private D1 backup/checksum, migration, registration-closed deployment, Minotaur/health/origin checks, password signup/login/recovery, real Google OIDC and explicit linking, two-device continuity, shared discovery attribution, and rollback.
+- Updated `ACCOUNTS-HANDOFF.md` with the exact proposal and byte-for-byte redirect requirement. No Google client ID/secret or Cloudflare setting was changed.
+
+Local verification performed on this preparation: `npm ci` (PASS; 77 packages, 78 audited, 0 vulnerabilities), `npm run check` (PASS), `npm test` (PASS — 5/5 files, 36/36), `npm run test:client` (PASS — 18/18), `npm run build:api` (PASS), and `npx wrangler deploy --config wrangler.staging.jsonc --dry-run --outdir .worker-build-staging` (PASS; no upload). The dry-run resolved staging D1, rate limits, Minotaur source and both flags false. Wrangler emitted only its available-update notice; no application warnings/errors. Generated dry-run output was removed. Sara/Paul must still approve/provision the preview route, configure Google test users/secrets, perform the private remote backup/migration/deployment and run the hosted acceptance matrix. Paul controls deployment.

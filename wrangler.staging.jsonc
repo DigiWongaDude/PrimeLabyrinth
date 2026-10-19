@@ -9,8 +9,9 @@
   "preview_urls": false,
   "observability": { "enabled": true, "head_sampling_rate": 1 },
   "vars": {
-    // Backend-only smoke checks. No frontend origin is approved yet.
-    "ALLOWED_ORIGINS": "https://between-g5-staging-api.digiwongadude.workers.dev",
+    // Source preparation for the isolated preview below. The preview hostname
+    // is proposed only; it is not provisioned or deployed by this change.
+    "ALLOWED_ORIGINS": "https://between-g5-preview.digiwongadude.com,https://between-g5-staging-api.digiwongadude.workers.dev",
     "REGISTRATION_ENABLED": "false",
     "ACCOUNTS_ENABLED": "false",
     "GOOGLE_CLIENT_ID": "",
