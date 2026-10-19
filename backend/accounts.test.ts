@@ -228,3 +228,35 @@ test('account client restores same traveller on a different device and keeps sec
   expect((await reloaded.resume()).journey.snapshot.activePath).toBe('0');
   await second.logout();expect(second.session).toBeNull();expect(second.journey.record).toBeNull();
 });
+
+test('anonymisation preserves public discovery ownership without revealing old display name',async()=>{
+  const a=await signup(),original=await journey(a.token);
+  expect((await move(a.token,0)).status).toBe(200);
+  const before=await call('discovery?path=0');
+  expect(before.data.discoverer.publicId).toBe(a.profile.publicId);
+  expect((await call('account/anonymise',{confirmation:'DELETE MY ACCOUNT'},a.token)).status).toBe(200);
+  const after=await call('discovery?path=0');
+  expect(after.data.discoverer).toEqual({publicId:a.profile.publicId,displayName:'Anonymous traveller'});
+  expect(after.data.firstDiscoveredAt).toBe(before.data.firstDiscoveredAt);
+  expect(after.data.canonicalPath).toBe(before.data.canonicalPath);
+  expect((await call('journey',undefined,a.token)).status).toBe(401);
+  const root=await call('discovery?path=ROOT');
+  expect(root.status).toBe(200);
+  expect(original.travellerId).toBeTruthy();
+});
+
+test('session rotation preserves a pending journey command and cannot restore an expired session',async()=>{
+  const a=await signup(),snapshot=await journey(a.token);
+  const requestId=crypto.randomUUID();
+  const command={requestId,expectedRevision:snapshot.revision,door:0};
+  const first=await call('advance',command,a.token);
+  expect(first.status).toBe(200);
+  const rotated=await call('auth/rotate',{},a.token);
+  expect(rotated.status).toBe(200);
+  expect((await call('advance',command,a.token)).status).toBe(401);
+  const retry=await call('advance',command,rotated.data.token);
+  expect(retry.status).toBe(200);
+  expect(retry.data).toEqual(first.data);
+  await env.DB.prepare('UPDATE sessions SET expires_at=0 WHERE token_hash=?').bind(await hash(rotated.data.token)).run();
+  expect((await call('auth/rotate',{},rotated.data.token)).status).toBe(401);
+});
