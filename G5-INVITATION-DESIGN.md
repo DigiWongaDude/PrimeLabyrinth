@@ -1,6 +1,11 @@
 # G5 invitation-only alpha: security design for Sara review
 
-Status: proposed design and acceptance tests, **not implemented**. Source reviewed:
+Status: design direction approved by Sara; a **schema-only review candidate** and
+20 executable local D1 tests now exist in `backend/invitation-candidate` and
+`backend/invitation-schema.test.ts`. The candidate is excluded from deployable
+migrations. API enforcement, frontend and operator tooling are **not implemented**.
+See [schema checkpoint](backend/invitation-candidate/README.md) for its transaction
+contract and the proposed transactional legacy-proof addition. Original source reviewed:
 `f40c66359f14ef8a516c92a820dfb5db4a0d9c49`, `codex/g5-persistence`.
 Paul approved invitation-only registration in the shared notes. This replaces
 the earlier recommendation for a short open-registration window. The public
