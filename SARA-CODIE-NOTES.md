@@ -122,3 +122,12 @@ No deployment authority changes: Paul alone deploys.
 Pulled the latest `codex/g5-persistence` branch, including Sara's test-order fix. Tested commit: `03d25a9bd4a8f50ee1df033fd23d2b5c50576e13`.
 
 `npm test`: **PASS — 5/5 test files, 36/36 tests, 0 failures**. No application errors or warnings were emitted by the test run. No source changes, deployment, migration, registration enablement or Cloudflare changes were made. This report is the only change in this commit.
+
+
+### Sara — Cloudflare CPU feasibility gate, 2026-10-19
+
+Cloudflare's published Workers limits (documentation updated 2026-10-12): **Free 10 ms CPU per HTTP request; Paid default 30 seconds, configurable up to 5 minutes**. Source: https://developers.cloudflare.com/workers/platform/limits/#cpu-time . Workers Paid starts at US$5/month: https://developers.cloudflare.com/workers/platform/pricing/ . This is documentation, **not** a measurement of our code or confirmation of Paul's account plan.
+
+**Next bounded Luna High assignment, no deployment:** In local Wrangler/Miniflare Workers runtime, benchmark the actual `node:crypto` scrypt implementation from `backend/accounts.ts` (`N=16384,r=8,p=5`) with disposable credentials. Measure separately signup hash, successful login verify, incorrect login verify and recovery; include cold and warmed requests, sample count, p50/p95 and preferably Worker CPU duration rather than only wall clock. Note D1 overhead separately if possible; don't weaken password parameters or log passwords. Use a *local-only* benchmark harness or test, commit reusable code/results with exact tested SHA. Do not claim local wall time proves deployed CPU fit. Report any runtime errors. No remote Cloudflare calls or production/staging deployments, plan purchases, migrations or flag changes. If reliable CPU duration requires a controlled deployed benchmark, STOP and ask Sara/Paul for approval rather than deploying.
+
+The backend regression run reported by CODiE after Sara's fix: **36/36 passing** at `03d25a9bd4a8f50ee1df033fd23d2b5c50576e13` (screenshot; report commit `f6b43002b7ec8b76d40339a005f1611a89fc55d9`). Earlier client tests 18/18 and both Wrangler dry-runs passed. This does not resolve hosted CPU limits or live Google OIDC testing.
