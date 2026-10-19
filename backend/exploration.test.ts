@@ -1,11 +1,11 @@
 import { env } from 'cloudflare:workers';
-import { applyD1Migrations } from 'cloudflare:test';
+import { prepareLegacyPool, takeLegacy, unknownTraveller } from './test-fixtures';
 import { beforeAll, expect, test } from 'vitest';
 import worker from './worker';
 
-beforeAll(async()=>{await applyD1Migrations(env.DB,env.TEST_MIGRATIONS)});
-let address=0;
-function traveller(){return {token:Array.from(crypto.getRandomValues(new Uint8Array(32)),x=>x.toString(16).padStart(2,'0')).join(''),ip:`198.51.100.${++address}`}}
+let legacyPool;
+beforeAll(async()=>{legacyPool=await prepareLegacyPool()});
+async function traveller(){return takeLegacy(legacyPool)}
 async function call(t,route,body=undefined){
   const response=await worker.fetch(new Request(`http://api/v1/${route}`,{
     method:body===undefined?'GET':'POST',headers:{Origin:'http://localhost:4175',...(t?{Authorization:`Bearer ${t.token}`} : {}),'Content-Type':'application/json','CF-Connecting-IP':t?.ip||'public-test'},
@@ -18,7 +18,7 @@ const back=(t,revision)=>call(t,'retrace',{requestId:crypto.randomUUID(),expecte
 const discovery=p=>env.DB.prepare('SELECT * FROM discoveries WHERE canonical_path=?').bind(`g5:2,2,3:${p}`).first();
 
 test('two travellers share discoveries but not histories; retracing and retries do not inflate counts',async()=>{
-  const a=traveller(),b=traveller();
+  const a=(await traveller()),b=(await traveller());
   const first=(await call(a,'travellers',{})).data;
   const second=(await call(b,'travellers',{})).data;
   expect(first.sharedDiscovery.isFirstDiscoverer).toBe(true);
@@ -47,7 +47,7 @@ test('two travellers share discoveries but not histories; retracing and retries 
 });
 
 test('different complete paths to an identical triple remain separate global locations',async()=>{
-  const t=traveller();await call(t,'travellers',{});let rev=0;
+  const t=(await traveller());await call(t,'travellers',{});let rev=0;
   for(const d of [0,0,1])expect((await move(t,rev++,d)).status).toBe(200);
   for(let i=0;i<2;i++)expect((await back(t,rev++)).status).toBe(200);
   for(const d of [1,1])expect((await move(t,rev++,d)).status).toBe(200);
@@ -61,7 +61,7 @@ test('different complete paths to an identical triple remain separate global loc
 });
 
 test('concurrent first arrivals have one permanent owner, and invalid requests cannot pollute the map',async()=>{
-  const players=[traveller(),traveller()];
+  const players=[(await traveller()),(await traveller())];
   for(const t of players){await call(t,'travellers',{});await move(t,0);await move(t,1)}
   const replies=await Promise.all(players.map(t=>move(t,2)));
   expect(replies.map(r=>r.status)).toEqual([200,200]);
@@ -80,7 +80,7 @@ test('concurrent first arrivals have one permanent owner, and invalid requests c
 });
 
 test('failure after shared insertion rolls back global discovery, personal visit and command together',async()=>{
-  const t=traveller();const id=(await call(t,'travellers',{})).data.travellerId;
+  const t=(await traveller());const id=(await call(t,'travellers',{})).data.travellerId;
   for(let rev=0;rev<3;rev++)expect((await move(t,rev)).status).toBe(200);
   const before=(await call(null,'exploration')).data;
   await env.DB.exec("CREATE TRIGGER test_shared_failure AFTER INSERT ON discoveries WHEN NEW.path='0000' BEGIN SELECT RAISE(ABORT,'simulated_shared_failure'); END;");

@@ -1,5 +1,5 @@
 // The deployed mathematical engine is imported directly, never reimplemented.
-import { START, targets, encodePath, decodePath } from '../engine.js';
+import { targets, encodePath, decodePath } from '../engine.js';
 import { ApiError } from './http';
 import { authenticate, accountRoute, type AccountEnv } from './accounts';
 
@@ -189,30 +189,16 @@ img { display: block; width: 100%; max-width: 900px; height: auto; }
       }
       const token = request.headers.get('Authorization')?.match(/^Bearer ([0-9a-f]{64})$/)?.[1];
       const tokenHash = token ? await hash(token) : null;
-      let traveller = tokenHash ? await findTraveller(db,tokenHash) : null;
+      const traveller = tokenHash ? await findTraveller(db,tokenHash) : null;
       if (route.startsWith('/v1/auth/') || route==='/v1/account' || route.startsWith('/v1/account/')) {
         return respond(await accountRoute(request,env,db,traveller,tokenHash,ip));
       }
       if (!tokenHash) fail(401,'credential_required');
       if (route === '/v1/travellers' && request.method === 'POST') {
         exact(await body(request),[]);
-        if (!traveller) {
-          if (String(env.ACCOUNTS_ENABLED)==='true') fail(403,'use_account_signup');
-          if (String(env.REGISTRATION_ENABLED) !== 'true') fail(403,'registration_closed');
-          if (!(await env.CREATE_LIMIT.limit({key:ip})).success) fail(429,'rate_limited');
-          const cap = Number(env.MAX_TRAVELLERS);
-          if (!Number.isSafeInteger(cap) || cap<1 || cap>10000) fail(503,'registration_unconfigured');
-          const id = crypto.randomUUID();
-          await db.batch([
-            db.prepare(`INSERT INTO travellers(id,token_hash) SELECT ?,? WHERE (SELECT count(*) FROM travellers)<?
-              ON CONFLICT(token_hash) DO NOTHING`).bind(id,tokenHash,cap),
-            db.prepare(`INSERT INTO visits(traveller_id,path,canonical_path,parent_path,a,b,c)
-              SELECT id,'ROOT','g5:2,2,3:ROOT',NULL,?,?,? FROM travellers WHERE token_hash=?
-              ON CONFLICT(traveller_id,path) DO NOTHING`).bind(...START,tokenHash)
-          ]);
-          traveller = await findTraveller(db,tokenHash);
-          if (!traveller) fail(403,'registration_full');
-        }
+        // Resume only under EVERY account/registration flag combination. New
+        // identities must enter via the atomic invitation-aware account routes.
+        if (!traveller) fail(403,'use_account_signup');
         return respond(await state(db,traveller.id));
       }
       if (!traveller) fail(401,'unknown_credential');

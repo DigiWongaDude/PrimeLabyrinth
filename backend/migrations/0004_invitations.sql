@@ -1,5 +1,5 @@
--- REVIEW CANDIDATE ONLY. Not in Wrangler's migrations_dir. Do not apply remotely
--- until the invitation-aware API and its route tests are implemented/reviewed.
+-- Requires the invitation-aware Worker. Keep registration closed during rollout
+-- or rollback. Remote application remains Paul's action after review.
 CREATE TABLE invitations (
   id TEXT PRIMARY KEY NOT NULL,
   token_hash TEXT NOT NULL UNIQUE CHECK(length(token_hash)=64 AND token_hash NOT GLOB '*[^0-9a-f]*'),

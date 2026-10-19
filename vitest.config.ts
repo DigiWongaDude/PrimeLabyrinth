@@ -6,9 +6,7 @@ export default defineConfig({
     wrangler: { configPath: './wrangler.jsonc' },
     miniflare: { bindings: {
       REGISTRATION_ENABLED: 'true',
-      TEST_MIGRATIONS: await readD1Migrations('./backend/migrations'),
-      // Review-only schema: never added to Wrangler's deployable migrations yet.
-      TEST_INVITATION_MIGRATIONS: await readD1Migrations('./backend/invitation-candidate')
+      TEST_MIGRATIONS: await readD1Migrations('./backend/migrations')
     } }
   }))],
   test: { include: ['backend/*.test.ts'], testTimeout: 20000 }

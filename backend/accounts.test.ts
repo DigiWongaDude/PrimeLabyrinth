@@ -1,13 +1,14 @@
 import { env } from 'cloudflare:workers';
-import { applyD1Migrations } from 'cloudflare:test';
 import { beforeAll, afterEach, expect, test, vi } from 'vitest';
 import { generateKeyPair, exportJWK, SignJWT } from 'jose';
 import worker from './worker';
 import { hash } from './http';
 import { randomToken } from './accounts';
 import { AccountClient } from '../account-client.js';
+import { prepareLegacyPool, takeLegacy, mintInvitation } from './test-fixtures';
 
-beforeAll(async()=>{await applyD1Migrations(env.DB,env.TEST_MIGRATIONS)});
+let legacyPool;
+beforeAll(async()=>{legacyPool=await prepareLegacyPool(2)});
 afterEach(()=>vi.restoreAllMocks());
 const password='A long traveller password 123!';
 let sequence=0;
@@ -20,7 +21,7 @@ async function call(route,data=undefined,token=null,ip=`203.0.113.${++sequence}`
       ...(data===undefined?{}:{'Content-Type':'application/json'})},...(data===undefined?{}:{body:JSON.stringify(data)})}),settings);
   return {status:response.status,data:await response.json(),response};
 }
-async function signup(u=user()){const {ip,...data}=u;const r=await call('auth/signup',data,null,ip);expect(r.status).toBe(200);return {...u,...r.data}}
+async function signup(u=user()){const {ip,...data}=u;const r=await call('auth/signup',{...data,invitation:await mintInvitation()},null,ip);expect(r.status).toBe(200);return {...u,...r.data}}
 async function journey(token){const r=await call('journey',undefined,token);expect(r.status).toBe(200);return r.data}
 async function move(token,revision,door=0){return call('advance',{requestId:crypto.randomUUID(),expectedRevision:revision,door},token)}
 
@@ -42,7 +43,7 @@ test('password account, case-insensitive login, logout and immutable public attr
   expect(discovery.data.discoverer).toEqual({publicId:a.profile.publicId,displayName:'Renamed traveller'});
   expect((await call('auth/logout',{},logged.data.token)).status).toBe(200);
   expect((await call('journey',undefined,logged.data.token)).status).toBe(401);
-  expect((await call('auth/signup',{username:a.username.toUpperCase(),password,displayName:'Duplicate'})).status).toBe(409);
+  expect((await call('auth/signup',{username:a.username.toUpperCase(),password,displayName:'Duplicate',invitation:await mintInvitation()})).status).toBe(409);
   const stored=JSON.stringify((await env.DB.prepare('SELECT * FROM accounts').all()).results);
   for(const secret of [password,a.token,a.recoveryKey])expect(stored).not.toContain(secret);
   const publicJson=JSON.stringify((await call('exploration')).data);
@@ -50,7 +51,7 @@ test('password account, case-insensitive login, logout and immutable public attr
 });
 
 test('old traveller upgrades without losing history, and old recovery code cannot hijack account',async()=>{
-  const legacy=randomToken();
+  const legacy=(await takeLegacy(legacyPool)).token;
   const old=await call('travellers',{},legacy,undefined,{...config,ACCOUNTS_ENABLED:'false'});
   expect(old.status).toBe(200);await move(legacy,0);
   const u=user(),{ip,...data}=u;
@@ -126,7 +127,7 @@ test('simultaneous recovery has one winner, deletion anonymises without removing
 async function googleStart(mode='login',token=null){
   const verifier=randomToken(),digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier));
   const challenge=btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
-  const r=await call('auth/google/start',{mode,challenge,displayName:'Star traveller'},token);
+  const r=await call('auth/google/start',{mode,challenge,displayName:'Star traveller',...(mode==='login'?{invitation:await mintInvitation()}:{})},token);
   expect(r.status).toBe(200);
   return {state:r.data.state,code:'google-test-code',verifier,nonce:new URL(r.data.url).searchParams.get('nonce')};
 }
@@ -203,7 +204,7 @@ test('explicit Google linking requires both identities and never links by email'
 });
 
 test('Google migration preserves legacy traveller and closed registration permits existing Google login only',async()=>{
-  const legacy=randomToken(),old=await call('travellers',{},legacy,undefined,{...config,ACCOUNTS_ENABLED:'false'});
+  const legacy=(await takeLegacy(legacyPool)).token,old=await call('travellers',{},legacy,undefined,{...config,ACCOUNTS_ENABLED:'false'});
   const attempt=await googleStart('migrate',legacy);await mockGoogle(attempt,'migrated-google');
   const result=await complete(attempt,legacy);expect(result.status).toBe(200);
   expect((await journey(result.data.token)).travellerId).toBe(old.data.travellerId);
@@ -219,7 +220,7 @@ function storage(){const m=new Map();return {getItem:k=>m.get(k)||null,setItem:(
 function transport(){const ip=`192.0.2.${++sequence}`;return (url,options)=>worker.fetch(new Request(url,{...options,headers:{...options.headers,Origin:'http://localhost:4175','CF-Connecting-IP':ip}}),config)}
 test('account client restores same traveller on a different device and keeps secrets out of stored profile',async()=>{
   const u=user(),firstStorage=storage(),first=new AccountClient('http://api',firstStorage,transport());
-  const created=await first.signup(u.username,password,u.displayName);await first.journey.move(0);
+  const created=await first.signup(u.username,password,u.displayName,null,await mintInvitation());await first.journey.move(0);
   const second=new AccountClient('http://api',storage(),transport());
   const logged=await second.login(u.username,password);
   expect(logged.journey.snapshot).toMatchObject({activePath:'0',travellerId:created.journey.snapshot.travellerId});

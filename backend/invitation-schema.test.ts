@@ -1,5 +1,4 @@
-// Schema/transaction tests, NOT HTTP invitation enforcement tests. The candidate
-// is deliberately separate from deployed migrations until backend integration.
+// Schema/transaction tests. HTTP enforcement is exercised separately.
 import { env } from 'cloudflare:workers';
 import { applyD1Migrations } from 'cloudflare:test';
 import { beforeAll, expect, test } from 'vitest';
@@ -18,7 +17,7 @@ async function snapshot(tables=admissionTables) {
 }
 let beforeMigration;
 beforeAll(async()=>{
-  await applyD1Migrations(env.DB,env.TEST_MIGRATIONS);
+  await applyD1Migrations(env.DB,env.TEST_MIGRATIONS.slice(0,3));
   for (const key of ['history','race','stale','guard','rollback','changed','disabled','anonymous','account']) {
     const entry={id:crypto.randomUUID(),tokenHash:await hash(randomToken())};
     legacy.set(key,entry);
@@ -36,7 +35,7 @@ beforeAll(async()=>{
     VALUES(?,'fixture-challenge',?,'http://localhost:4175','login','Old flow',unixepoch()+600)`)
     .bind(await hash(randomToken()),await hash(randomToken())).run();
   beforeMigration=await snapshot(ledgerTables);
-  await applyD1Migrations(env.DB,env.TEST_INVITATION_MIGRATIONS);
+  await applyD1Migrations(env.DB,env.TEST_MIGRATIONS);
 });
 
 async function invite(options:{created?:number;expires?:number;revoked?:number|null}={}) {
@@ -88,7 +87,7 @@ test('candidate migration preserves populated ledger/credentials and snapshots o
   expect(rows.map(r=>r.traveller_id).sort()).toEqual(['history','race','stale','guard','rollback','changed'].map(k=>legacy.get(k).id).sort());
   expect(await env.DB.prepare('SELECT invite_hash FROM oauth_attempts').first('invite_hash')).toBeNull();
   const before=await snapshot();
-  await applyD1Migrations(env.DB,[...env.TEST_MIGRATIONS,...env.TEST_INVITATION_MIGRATIONS]);
+  await applyD1Migrations(env.DB,env.TEST_MIGRATIONS);
   expect(await snapshot()).toEqual(before);
   expect((await env.DB.prepare('PRAGMA foreign_key_check').all()).results).toEqual([]);
 });

@@ -2,6 +2,7 @@ import { scryptSync, timingSafeEqual } from 'node:crypto';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { START } from '../engine.js';
 import { body, exact, fail, hash } from './http';
+import { invitationDigest, requireInvitation } from './invitations';
 
 type DB = D1DatabaseSession;
 export type AccountEnv = Env & { GOOGLE_CLIENT_SECRET?: string };
@@ -10,7 +11,7 @@ type Account = { traveller_id:string; username:string|null; password_hash:string
 export type Identity = { id:string; active_path:string; revision:number; session_hash:string|null;
   authenticated_at:number; account_version:number|null };
 type Attempt = { state_hash:string; challenge:string; nonce_hash:string; origin:string;
-  mode:'login'|'link'|'migrate'; traveller_id:string|null; session_hash:string|null; display_name:string; expires_at:number };
+  mode:'login'|'link'|'migrate'; traveller_id:string|null; session_hash:string|null; display_name:string; expires_at:number; invite_hash:string|null };
 const now = () => Math.floor(Date.now()/1000);
 const SESSION_SECONDS = 12*60*60;
 const FRESH_SECONDS = 10*60;
@@ -100,29 +101,41 @@ function registration(env:AccountEnv) {
   if (!Number.isSafeInteger(cap)||cap<1||cap>10000) fail(503,'registration_unconfigured');
   return cap;
 }
-async function createAccount(db:DB,env:AccountEnv,options:{name:string;username:string|null;passwordHash:string|null;sub:string|null;legacy:Identity|null}) {
+async function createAccount(db:DB,env:AccountEnv,options:{name:string;username:string|null;passwordHash:string|null;sub:string|null;legacy:Identity|null;legacyProof:string|null;inviteHash:string|null}) {
   const cap=registration(env),id=options.legacy?.id||crypto.randomUUID();
   if (options.legacy?.session_hash) fail(409,'already_has_account');
   const recoveryKey=randomToken(),recoveryHash=await hash(recoveryKey),unusedHash=await hash(randomToken());
+  const token=randomToken(),tokenHash=await hash(token),expiresAt=now()+SESSION_SECONDS;
   const statements:D1PreparedStatement[]=[];
-  if (!options.legacy) statements.push(
-    db.prepare(`INSERT INTO travellers(id,token_hash) SELECT ?,? WHERE (SELECT count(*) FROM travellers)<?`).bind(id,unusedHash,cap)
-  );
+  if (options.legacy) {
+    if (!options.legacyProof) fail(401,'legacy_credential_required');
+    statements.push(db.prepare('INSERT INTO legacy_upgrade_proofs(traveller_id,token_hash) VALUES(?,?)').bind(id,options.legacyProof));
+  } else {
+    if (!options.inviteHash) fail(403,'invitation_unavailable');
+    statements.push(
+      db.prepare(`INSERT INTO travellers(id,token_hash) SELECT ?,? WHERE (SELECT count(*) FROM travellers)<?`).bind(id,unusedHash,cap),
+      db.prepare('INSERT INTO invitation_redemptions(invite_hash,traveller_id) VALUES(?,?)').bind(options.inviteHash,id)
+    );
+  }
   statements.push(
     db.prepare(`INSERT INTO accounts(traveller_id,username,password_hash,google_sub,recovery_hash)
       VALUES(?,?,?,?,?)`).bind(id,options.username,options.passwordHash,options.sub,recoveryHash),
-    // Retire the old recovery credential even if an older Worker is rolled back.
-    db.prepare('UPDATE travellers SET token_hash=? WHERE id=?').bind(unusedHash,id),
+    // The account trigger consumes admission proof and retires the old token.
     db.prepare('UPDATE profiles SET display_name=? WHERE traveller_id=?').bind(options.name,id),
     db.prepare(`INSERT INTO visits(traveller_id,path,canonical_path,parent_path,a,b,c) VALUES(?,'ROOT','g5:2,2,3:ROOT',NULL,?,?,?)
-      ON CONFLICT(traveller_id,path) DO NOTHING`).bind(id,...START)
+      ON CONFLICT(traveller_id,path) DO NOTHING`).bind(id,...START),
+    db.prepare(`INSERT INTO sessions(token_hash,traveller_id,account_version,authenticated_at,expires_at)
+      VALUES(?,?,1,?,?)`).bind(tokenHash,id,now(),expiresAt)
   );
   try { await db.batch(statements); }
   catch(error) {
+    if (/invitation_unavailable|invitation_redemptions.invite_hash/.test(String(error))) fail(403,'invitation_unavailable');
+    if (/legacy_proof_invalid/.test(String(error))) fail(401,'legacy_credential_required');
+    if (/admission_required/.test(String(error))) fail(409,'account_unavailable');
     if (/UNIQUE constraint|FOREIGN KEY constraint/.test(String(error))) fail(409,'account_unavailable');
     throw error;
   }
-  return {...await issueSession(db,await account(db,id)),recoveryKey};
+  return {token,expiresAt,profile:await profile(db,id),recoveryKey};
 }
 // CAS credential changes invalidate all old sessions atomically. Competing
 // password reset/change/link operations can never silently overwrite each other.
@@ -190,6 +203,7 @@ export async function accountRoute(request:Request,env:AccountEnv,db:DB,identity
   if (String(env.ACCOUNTS_ENABLED)!=='true') fail(503,'accounts_disabled');
   if (route==='/v1/auth/config' && request.method==='GET') return {
     registrationEnabled:String(env.REGISTRATION_ENABLED)==='true',
+    invitationRequired:true,
     googleEnabled:!!(env.GOOGLE_CLIENT_ID&&env.GOOGLE_REDIRECT_URI&&env.GOOGLE_CLIENT_SECRET)
   };
   if (route==='/v1/account' && request.method==='GET') {
@@ -201,13 +215,18 @@ export async function accountRoute(request:Request,env:AccountEnv,db:DB,identity
   await cleanup(db);
   const data=await body(request);
   if (route==='/v1/auth/signup' || route==='/v1/auth/upgrade') {
-    exact(data,['username','password','displayName']);
+    const isUpgrade=route.endsWith('/upgrade');
+    exact(data,['username','password','displayName'],isUpgrade?[]:['invitation']);
     registration(env);
     if (!(await env.CREATE_LIMIT.limit({key:ip})).success) fail(429,'rate_limited');
-    if (route.endsWith('/upgrade') && (!identity || identity.session_hash)) fail(401,'legacy_credential_required');
-    if (route.endsWith('/signup') && identity) fail(409,'sign_out_first');
+    await throttle(db,`admission:${ip}`,5,60);
+    if (isUpgrade && (!identity || identity.session_hash)) fail(401,'legacy_credential_required');
+    if (!isUpgrade && identity) fail(409,'sign_out_first');
+    const inviteHash=isUpgrade?null:await invitationDigest(data.invitation);
+    if (!isUpgrade) await requireInvitation(db,inviteHash);
     return createAccount(db,env,{name:displayName(data.displayName),username:username(data.username),
-      passwordHash:passwordHash(password(data.password)),sub:null,legacy:route.endsWith('/upgrade')?identity:null});
+      passwordHash:passwordHash(password(data.password)),sub:null,legacy:isUpgrade?identity:null,
+      legacyProof:isUpgrade?tokenHash:null,inviteHash});
   }
   if (route==='/v1/auth/login') {
     exact(data,['username','password']);
@@ -230,16 +249,19 @@ export async function accountRoute(request:Request,env:AccountEnv,db:DB,identity
       sub:a.google_sub,recoveryHash:await hash(recoveryKey)}),recoveryKey};
   }
   if (route==='/v1/auth/google/start') {
-    exact(data,['mode','challenge','displayName']);
+    exact(data,['mode','challenge','displayName'],data.mode==='login'?['invitation']:[]);
     const config=googleConfig(env,origin);
     if (!['login','link','migrate'].includes(String(data.mode)) || typeof data.challenge!=='string' || !/^[A-Za-z0-9_-]{43}$/.test(data.challenge)) fail(400,'invalid_oauth_request');
     if (data.mode==='link') fresh(identity);
     if (data.mode==='migrate' && (!identity || identity.session_hash)) fail(401,'legacy_credential_required');
     if (data.mode==='login' && identity) fail(409,'sign_out_first');
+    // Do not check availability or consume at start: returning Google accounts
+    // must still sign in with an absent, unknown, expired or spent invitation.
+    const inviteHash=data.invitation===undefined?null:await invitationDigest(data.invitation);
     const state=randomToken(),nonce=randomToken(),name=displayName(data.displayName);
-    await db.prepare(`INSERT INTO oauth_attempts(state_hash,challenge,nonce_hash,origin,mode,traveller_id,session_hash,display_name,expires_at)
-      VALUES(?,?,?,?,?,?,?,?,?)`).bind(await hash(state),data.challenge,await hash(nonce),origin,data.mode,identity?.id||null,
-        tokenHash,name,now()+600).run();
+    await db.prepare(`INSERT INTO oauth_attempts(state_hash,challenge,nonce_hash,origin,mode,traveller_id,session_hash,display_name,expires_at,invite_hash)
+      VALUES(?,?,?,?,?,?,?,?,?,?)`).bind(await hash(state),data.challenge,await hash(nonce),origin,data.mode,identity?.id||null,
+        tokenHash,name,now()+600,inviteHash).run();
     const url=new URL('https://accounts.google.com/o/oauth2/v2/auth');
     url.search=new URLSearchParams({client_id:config.clientId,redirect_uri:config.redirect,response_type:'code',scope:'openid email',
       state,nonce,code_challenge:data.challenge,code_challenge_method:'S256',prompt:'select_account'}).toString();
@@ -265,8 +287,12 @@ export async function accountRoute(request:Request,env:AccountEnv,db:DB,identity
     }
     if (attempt.mode==='migrate' && existing) fail(409,'identity_already_linked');
     if (existing) return issueSession(db,existing);
+    registration(env);
     if (!(await env.CREATE_LIMIT.limit({key:ip})).success) fail(429,'rate_limited');
-    return createAccount(db,env,{name:attempt.display_name,username:null,passwordHash:null,sub,legacy:attempt.mode==='migrate'?identity:null});
+    await throttle(db,`admission:${ip}`,5,60);
+    if (attempt.mode==='login') await requireInvitation(db,attempt.invite_hash);
+    return createAccount(db,env,{name:attempt.display_name,username:null,passwordHash:null,sub,legacy:attempt.mode==='migrate'?identity:null,
+      legacyProof:attempt.mode==='migrate'?tokenHash:null,inviteHash:attempt.invite_hash});
   }
   if (!identity?.session_hash) fail(401,'account_required');
   if (route==='/v1/auth/logout') {

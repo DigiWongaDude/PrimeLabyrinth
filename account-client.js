@@ -44,8 +44,10 @@ export class AccountClient {
     }
   }
   async login(username,password){return this.accept(await this.request('auth/login',{username,password},null))}
-  async signup(username,password,displayName,legacyToken=null){
-    return this.accept(await this.request(legacyToken?'auth/upgrade':'auth/signup',{username,password,displayName},legacyToken));
+  async signup(username,password,displayName,legacyToken=null,invitation=undefined){
+    return this.accept(await this.request(legacyToken?'auth/upgrade':'auth/signup',{
+      username,password,displayName,...(!legacyToken&&invitation!==undefined?{invitation}:{})
+    },legacyToken));
   }
   async recover(publicId,recoveryKey,username,password){
     return this.accept(await this.request('auth/recover',{publicId,recoveryKey,username,password},null));
@@ -72,11 +74,13 @@ export class AccountClient {
     if(this.journey.record?.pending)throw new Error('Retry your pending move before deleting your account.');
     await this.request('account/anonymise',{confirmation});this.clear();
   }
-  async startGoogle(mode,displayName,legacyToken=null){
+  async startGoogle(mode,displayName,legacyToken=null,invitation=undefined){
     const verifier=Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
     const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier));
     const challenge=btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
-    const result=await this.request('auth/google/start',{mode,challenge,displayName},mode==='migrate'?legacyToken:mode==='login'?null:this.session?.token);
+    const result=await this.request('auth/google/start',{
+      mode,challenge,displayName,...(mode==='login'&&invitation!==undefined?{invitation}:{})
+    },mode==='migrate'?legacyToken:mode==='login'?null:this.session?.token);
     this.storage.setItem(OAUTH_KEY,JSON.stringify({api:this.base,state:result.state,verifier,mode,legacyToken}));
     return result.url;
   }

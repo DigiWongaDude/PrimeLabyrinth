@@ -23,6 +23,6 @@ export async function body(request: Request): Promise<Record<string, unknown>> {
   if (!data || typeof data !== 'object' || Array.isArray(data)) fail(400, 'invalid_body');
   return Object.fromEntries(Object.entries(data));
 }
-export function exact(data: Record<string, unknown>, keys: string[]) {
-  if (Object.keys(data).some(k => !keys.includes(k)) || keys.some(k => !(k in data))) fail(400, 'unexpected_fields');
+export function exact(data: Record<string, unknown>, keys: string[], optional: string[] = []) {
+  if (Object.keys(data).some(k => !keys.includes(k) && !optional.includes(k)) || keys.some(k => !(k in data))) fail(400, 'unexpected_fields');
 }
