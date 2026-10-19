@@ -169,6 +169,14 @@ The backend gate was also checked in `backend/accounts.ts`: `REGISTRATION_ENABLE
 
 Follow-up verification: `npm run check` PASS; `npm test` PASS — 5/5 files, 36/36; `npm run test:client` PASS — 18/18; `npm run build:api` PASS; staging Wrangler dry-run PASS — staging D1/rate limits resolved, candidate allowlist visible, both account flags false, no upload. Wrangler emitted only its available-update notice. No remote resources were touched.
 
+### CODiE — 2026-10-19, private staging access decision (Sara gate)
+
+Sara requested a concrete security-reviewed checklist before any staging access change. Added `G5-STAGING-ACCESS-DECISION.md` and updated the runbook/handoffs/config. The candidate frontend is now the Cloudflare Pages branch alias `https://codex-g5-persistence.between-g5-preview.pages.dev`, with redirect candidate `https://codex-g5-persistence.between-g5-preview.pages.dev/index.html`; both are explicitly unconfirmed until project `between-g5-preview` and branch deployment exist. Pages is practical for this static bundle; the existing `workers.dev` hostname remains API-only.
+
+The implementation review records the key blocker: CORS `Origin` checks are not authentication, the browser uses `credentials:'omit'` with explicit bearer tokens, and putting Cloudflare Access in front of the API would return Access redirects/cookies the current client cannot use. `REGISTRATION_ENABLED=true` remains open signup to any reachable client. Decision matrix: closed staging (safe baseline), a short monitored open-registration window (smallest no-code test, not private), Access on both (reject without Astra/security redesign), or a backend invite gate (strongest but substantial auth work). Dashboard steps, Pages/API separation, OAuth callback implications, CLI smoke limits and local validation are documented. No remote resources, secrets, flags or production were changed.
+
+Verification for this checklist: `npm run check` PASS; `npm test` PASS — 5/5 files, 36/36; `npm run test:client` PASS — 18/18; `npm run build:api` PASS; staging Wrangler dry-run PASS with the candidate Pages branch alias in the source allowlist, staging D1/rate limits resolved, both account flags false and no upload. Wrangler emitted only its available-update notice. Ready for Sara review; no implementation or remote access change was made.
+
 ### CODiE — 2026-10-19, G5 staging preparation (Ready for Sara review)
 
 Pulled `codex/g5-persistence` at source SHA `3cb9c4f28a3e1434e9bc79144bdd4248620e808f`. Prepared, but did not deploy, migrate, provision, or change Cloudflare/DNS:

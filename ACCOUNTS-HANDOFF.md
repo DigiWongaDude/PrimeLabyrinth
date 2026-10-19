@@ -98,17 +98,19 @@ explicit and requires a recently authenticated account and the completed Google
 flow, tied to the same session. A Google identity already owned by a different
 traveller is rejected. We never automatically merge histories.
 
-1. Use an isolated Cloudflare Pages preview, not a custom domain:
-   `https://between-g5-preview.pages.dev` (**UNCONFIRMED candidate**; it exists
-   only if a Pages project is provisioned with that exact name). Keep G1–G4's
+1. Use an isolated Cloudflare Pages branch preview, not a custom domain:
+   `https://codex-g5-persistence.between-g5-preview.pages.dev`
+   (**UNCONFIRMED candidate**; it exists only if a Pages project named
+   `between-g5-preview` deploys branch `codex/g5-persistence`). Keep G1–G4's
    production site unchanged. The candidate is listed in the *source* staging
    `ALLOWED_ORIGINS`; no Cloudflare setting, Pages project or DNS record has
    been changed. The existing `workers.dev` hostname remains API-only.
 2. In Paul's Google Cloud project, configure OAuth consent and a **Web application**
    OAuth client. While testing, restrict audience to named test users.
-3. Once the Pages project name is confirmed, set its authorised redirect URI to
-   the exact preview page (candidate, currently unconfirmed):
-   `https://between-g5-preview.pages.dev/index.html` (no query or fragment).
+3. Once the Pages project and branch alias are confirmed, set its authorised
+   redirect URI to the exact preview page (candidate, currently unconfirmed):
+   `https://codex-g5-persistence.between-g5-preview.pages.dev/index.html`
+   (no query or fragment).
    The value must match `GOOGLE_REDIRECT_URI` byte-for-byte. Approve its JavaScript
    origin as appropriate. Only `openid email` scopes are requested.
 4. Set public `GOOGLE_CLIENT_ID` and `GOOGLE_REDIRECT_URI` in the staging config.
