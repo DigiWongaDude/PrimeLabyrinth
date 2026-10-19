@@ -1,6 +1,9 @@
 # The Between — G5 Stage A (review branch)
 
 Implements [issue #34](https://github.com/DigiWongaDude/PrimeLabyrinth/issues/34).
+Account work for [issue #38](https://github.com/DigiWongaDude/PrimeLabyrinth/issues/38)
+is prepared for review, not deployed. See [account handoff](ACCOUNTS-HANDOFF.md) for
+password/Google setup, public attribution, recovery and manual deployment gates.
 Based on deployed `gh-pages` commit `1fd2cc69635d77f12c04540624b67f1c313a766c`.
 **Backend deployed to isolated staging only. No frontend deployment or public signup.**
 See [staging handoff](STAGING-HANDOFF.md) for the exact configuration, checks and
@@ -51,8 +54,9 @@ The first **successfully committed** visit owns a mapped discovery, regardless o
 who first sent a request or received a response. Later arrivals never replace its
 owner or timestamp. Historical backfill picks the earliest saved timestamp; if
 timestamps tie, lexical traveller ID breaks the tie deterministically. This is
-not proof of arrival order for old tied records. Attribution is shown only as
-"you first mapped" versus "another traveller"; public statistics omit owner IDs.
+not proof of arrival order for old tied records. Public attribution uses a separate
+random public ID and current display name. Private internal traveller/auth IDs
+remain omitted. A rename changes the visible name but not discovery ownership.
 
 The public read API exposes totals and ten recent first discoveries (canonical
 path, triple and first timestamp). Personal timelines, active routes, credentials

@@ -12,6 +12,9 @@
     // Backend-only smoke checks. No frontend origin is approved yet.
     "ALLOWED_ORIGINS": "https://between-g5-staging-api.digiwongadude.workers.dev",
     "REGISTRATION_ENABLED": "false",
+    "ACCOUNTS_ENABLED": "false",
+    "GOOGLE_CLIENT_ID": "",
+    "GOOGLE_REDIRECT_URI": "",
     "MAX_TRAVELLERS": "10"
   },
   "d1_databases": [{

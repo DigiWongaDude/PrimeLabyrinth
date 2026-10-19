@@ -1,5 +1,12 @@
 # For Sara — issue #36 staging backend complete
 
+**Later deployment history:** Sara's 2026-10-18 Minotaur update (`db0bd57`,
+deployment `657d7334070547bbbc7d8cca6ded13a0`) is recorded in
+[shared notes](SARA-CODIE-NOTES.md). The original root-rejection description below
+is historical: exact `GET /` now serves the entrance. Issue #38 account changes
+are **not deployed**; see [account handoff](ACCOUNTS-HANDOFF.md). Paul controls all
+further deployments, including staging.
+
 Paul explicitly approved isolated staging migrations and backend deployment in
 chat. Completed 2026-10-18; stopped after backend smoke checks. No frontend launch
 or public registration is included in this approval.

@@ -16,6 +16,11 @@ test('additive migration backfills earliest discovery and preserves existing pri
   await applyD1Migrations(env.DB,env.TEST_MIGRATIONS);
   expect((await env.DB.prepare('SELECT * FROM visits ORDER BY traveller_id,path').all()).results).toEqual(beforeVisits);
   expect((await env.DB.prepare('SELECT * FROM travellers ORDER BY id').all()).results).toEqual(beforeTravellers);
+  const profiles=(await env.DB.prepare('SELECT * FROM profiles ORDER BY traveller_id').all()).results;
+  expect(profiles).toHaveLength(2);
+  expect(profiles[0].public_id).not.toBe(profiles[1].public_id);
+  expect(profiles.every(p=>p.legacy_enabled===1&&p.display_name==='Traveller')).toBe(true);
+  expect(await env.DB.prepare('SELECT count(*) AS n FROM accounts').first('n')).toBe(0);
   expect(await env.DB.prepare('SELECT count(*) AS n FROM discoveries').first('n')).toBe(2);
   expect(await env.DB.prepare("SELECT first_traveller_id FROM discoveries WHERE path='ROOT'").first('first_traveller_id')).toBe('old-a');
   expect(await env.DB.prepare("SELECT first_traveller_id,first_discovered_at FROM discoveries WHERE path='0'").first()).toEqual({first_traveller_id:'old-b',first_discovered_at:'2026-10-01T01:00:00.000Z'});

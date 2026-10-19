@@ -35,6 +35,7 @@ function appHarness(api=''){
   const element=id=>{if(!elements.has(id))elements.set(id,{hidden:true,style:{},dataset:{},getContext:()=>context,addEventListener:noop,querySelectorAll:()=>[],getBoundingClientRect:()=>({left:0,top:0,width:1280,height:800})});return elements.get(id)};
   const saved=new Map();
   const sandbox={...engine,...view,G5_API_URL:api,console,URL,document:{querySelector:element,body:{dataset:{}},addEventListener:noop},localStorage:{getItem:k=>saved.get(k)||null,setItem:(k,v)=>saved.set(k,v),removeItem:k=>saved.delete(k)},history:{replaceState:noop},location:{hash:'#g=4&path=0'},devicePixelRatio:1,innerWidth:1280,innerHeight:800,addEventListener:noop,setInterval:noop,requestAnimationFrame:noop};
+  sandbox.URLSearchParams=URLSearchParams;
   vm.createContext(sandbox);
   vm.runInContext(readFileSync(new URL('../app.js',import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,''),sandbox);
   return code=>vm.runInContext(code,sandbox);

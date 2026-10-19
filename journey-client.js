@@ -4,7 +4,7 @@ export class JourneyError extends Error {
   constructor(code, status=0) { super(code); this.status=status; }
 }
 export class JourneyClient {
-  constructor(base, storage=localStorage, fetcher=fetch) {
+  constructor(base, storage=localStorage, fetcher=(...args)=>fetch(...args)) {
     this.base=base.replace(/\/$/,''); this.storage=storage; this.fetcher=fetcher;
     this.record=null; this.busy=false;
     const saved=storage.getItem(JOURNEY_KEY);

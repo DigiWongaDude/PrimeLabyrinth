@@ -7,6 +7,7 @@
     "test:client": "node --test tests/*.test.mjs",
     "check": "wrangler types && tsc --noEmit",
     "dev:api": "wrangler dev --local",
+    "dev:accounts": "wrangler dev --local --ip 127.0.0.1 --var ACCOUNTS_ENABLED:true --var REGISTRATION_ENABLED:true",
     "dev:web": "node serve.mjs",
     "smoke:local": "node smoke.mjs",
     "migrate:local": "wrangler d1 migrations apply between-g5 --local",
@@ -18,5 +19,8 @@
     "typescript": "^7.0.2",
     "vitest": "^5.0.5",
     "wrangler": "^4.151.1"
+  },
+  "dependencies": {
+    "jose": "^6.2.12"
   }
 }

@@ -10,6 +10,9 @@
   "vars": {
     "ALLOWED_ORIGINS": "http://localhost:4175,http://127.0.0.1:4175",
     "REGISTRATION_ENABLED": "false",
+    "ACCOUNTS_ENABLED": "false",
+    "GOOGLE_CLIENT_ID": "",
+    "GOOGLE_REDIRECT_URI": "",
     "MAX_TRAVELLERS": "100"
   },
   "d1_databases": [{

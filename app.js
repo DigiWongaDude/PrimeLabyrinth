@@ -1,6 +1,7 @@
 import {START,ROOM_SIZE,INWARD,accentFor,arrivalFrom,cellOf,diamondRows,encodePath,decodePath,makeDoors,makeTerrain,replay,roomArchitecture,stableSeed,walkRoute} from "./engine.js";
 import {turnPoint,turnVector,viewDepth,boundaryWalls} from "./view.js";
 import {JourneyClient} from "./journey-client.js";
+import {AccountClient} from "./account-client.js";
 import {G5_API_URL} from "./g5-config.js";
 
 const canvas=document.querySelector("#game"),ctx=canvas.getContext("2d");
@@ -9,7 +10,7 @@ const W=1280,H=800,OX=640,OY=340,TX=38,TY=15,LH=50,WALL_HEIGHT=4.6,INK=[9,13,20]
 const sum=a=>a.reduce((x,y)=>x+y,0), terrainAt=(m,p)=>m.get(`${p[0]},${p[1]}`)||0;
 const css=c=>`rgb(${c.map(Math.round).join(" ")})`,blend=(a,b,t)=>a.map((x,i)=>Math.round(x+(b[i]-x)*t));
 let cameraTurns=0;
-let journeyClient=null,g5Busy=false;
+let journeyClient=null,accountClient=null,g5Busy=false;
 const iso=(x,y,z=0)=>{[x,y]=turnPoint([x,y],cameraTurns);return[Math.round(OX+(x-y)*TX),Math.round(OY+(x+y)*TY-z*LH)]};
 const depth=point=>viewDepth(point,cameraTurns);
 const polygon=(points,fill,stroke=null,width=1)=>{ctx.beginPath();ctx.moveTo(...points[0]);for(const p of points.slice(1))ctx.lineTo(...p);ctx.closePath();if(fill){ctx.fillStyle=css(fill);ctx.fill()}if(stroke){ctx.strokeStyle=css(stroke);ctx.lineWidth=width;ctx.stroke()}};
@@ -73,7 +74,7 @@ const initial=initialState();let game;try{game=new Game(initial.path,initial.gen
 function fit(){const dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);canvas.style.aspectRatio=`${W}/${H}`;const sw=innerWidth,sh=innerHeight,scale=Math.min(sw/W,sh/H);canvas.style.width=`${W*scale}px`;canvas.style.height=`${H*scale}px`;canvas.style.left=`${(sw-W*scale)/2}px`;canvas.style.top=`${(sh-H*scale)/2}px`}
 addEventListener("resize",fit);fit();canvas.addEventListener("pointerdown",e=>{const r=canvas.getBoundingClientRect();game.click([(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height])});
 document.querySelector("#back").onclick=()=>{if(game.path.length)game.setDestination(game.entrance.approach,"back")};
-document.querySelector("#share").onclick=async()=>{const url=new URL(location.href);url.hash=`g=${game.geometryGeneration}&path=${encodePath(game.path)}`;try{await navigator.clipboard.writeText(url.href);game.notice=game.generation===5?"G4 geometry link copied. Resume G5 with your PRIVATE recovery code.":"Path link copied — this exact visit can be shared"}catch{prompt("Copy this path link",url.href);game.notice="Path link ready to copy"}game.sync()};
+document.querySelector("#share").onclick=async()=>{const url=new URL(location.href);url.search='';url.hash=`g=${game.geometryGeneration}&path=${encodePath(game.path)}`;try{await navigator.clipboard.writeText(url.href);game.notice=game.generation===5?"G4 geometry link copied. Sign in to resume your private G5 journey.":"Path link copied — this exact visit can be shared"}catch{prompt("Copy this path link",url.href);game.notice="Path link ready to copy"}game.sync()};
 const generationToggle=document.querySelector("#generation-toggle"),generationMenu=document.querySelector("#generation-menu");
 generationToggle.onclick=event=>{event.stopPropagation();generationMenu.hidden=!generationMenu.hidden};
 for(const button of generationMenu.querySelectorAll("[data-generation]"))button.onclick=()=>{if(g5Busy)return;generationMenu.hidden=true;if(button.dataset.generation==='5'){openJourney();return}localStorage.removeItem("prime-labyrinth-browser-v1");localStorage.removeItem("prime-labyrinth-browser-v2");game=new Game([],Number(button.dataset.generation))};
@@ -100,7 +101,7 @@ function showExploration(snapshot){
     ?`Shared G5 exploration at last sync: ${totals.totalLocations} path locations · ${totals.uniqueTriples} distinct prime triples.`
     :'Every connected G5 traveller contributes to the same shared exploration archive.';
   document.querySelector('#shared-discovery').textContent=discovery
-    ?`${discovery.isFirstDiscoverer?'You first mapped this location.':'Another traveller first mapped this location.'} ${discovery.travellerCount} traveller(s) have reached this exact path. This is a mapped location, not an AI image.`
+    ?`${discovery.isFirstDiscoverer?'You first mapped this location.':`${discovery.discoverer?.displayName||'Another traveller'} first mapped this location.`} ${discovery.travellerCount} traveller(s) have reached this exact path. This is a mapped location, not an AI image.`
     :'';
 }
 function applyJourney(result,source=null,action=null){
@@ -130,20 +131,63 @@ async function saveG5Move(source,action){
 document.querySelector('#journey-manage').onclick=openJourney;
 document.querySelector('#journey-connect').onclick=connectJourney;
 document.querySelector('#journey-close').onclick=()=>journeyDialog.close();
+journeyDialog.addEventListener('close',()=>{document.querySelector('#account-key-output').textContent='';document.querySelector('#account-key-notice').hidden=true;for(const field of journeyDialog.querySelectorAll('input[type=password]'))field.value='';});
 document.querySelector('#journey-export').onclick=async()=>{
   try{
     const token=getJourneyClient().record?.token;
+    if(journeyClient===accountClient?.journey)throw new Error('Use Account settings to create a recovery key. Session tokens are not recovery codes.');
     if(!token)throw new Error('Connect first');
     try{await navigator.clipboard.writeText(token);journeyMessage.textContent='Private recovery code copied. Store it securely; do not share it in a public path link.';}
     catch{prompt('PRIVATE traveller recovery code — treat like a password',token);}
   }catch(error){journeyMessage.textContent=error.message;}
 };
-if(initial.generation===5){
+function getAccountClient(){
+  if(!G5_API_URL)throw new Error('Accounts are not enabled yet. G1–G4 remain available.');
+  if(!accountClient)accountClient=new AccountClient(G5_API_URL);
+  return accountClient;
+}
+function accountIdentity(profile){
+  document.querySelector('#account-identity').textContent=profile?`${profile.displayName} · Public traveller ID: ${profile.publicId}`:'Sign in on any device to resume the same traveller.';
+  if(profile){document.querySelector('#account-public-id').value=profile.publicId;document.querySelector('#account-name').value=profile.displayName;document.querySelector('#account-username').value=profile.username||'';}
+}
+async function accountAction(action){
+  if(g5Busy)return;g5Busy=true;journeyMessage.textContent='Working…';
+  try{
+    const client=getAccountClient(),result=await action(client);
+    if(result?.journey){journeyClient=client.journey;applyJourney(result.journey);accountIdentity(result.profile);}
+    else if(result?.publicId){accountIdentity(result);journeyMessage.textContent='Display name saved.';}
+    else if(result===null){journeyClient=null;accountIdentity(null);game=new Game([],4);journeyMessage.textContent='Signed out. Your discoveries remain in the shared archive.';}
+    if(result?.recoveryKey){document.querySelector('#account-key-output').textContent=result.recoveryKey;document.querySelector('#account-key-notice').hidden=false;document.querySelector('#account-key-output').closest('details').open=true;journeyMessage.textContent='Connected. Save the private recovery key shown below before closing.';}
+  }catch(error){journeyMessage.textContent=`Account: ${error.message.replaceAll('_',' ')}. Your saved journey has not been reset.`;}
+  finally{for(const field of journeyDialog.querySelectorAll('input[type=password]'))field.value='';g5Busy=false;}
+}
+const inputValue=id=>document.querySelector(`#${id}`).value;
+document.querySelector('#account-form').onsubmit=event=>{event.preventDefault();void accountAction(c=>c.login(inputValue('account-username'),inputValue('account-password')))};
+document.querySelector('#account-signup').onclick=()=>accountAction(c=>c.signup(inputValue('account-username'),inputValue('account-password'),inputValue('account-name')));
+document.querySelector('#account-upgrade').onclick=()=>accountAction(c=>{const legacy=getJourneyClient();if(!legacy.record?.registered||legacy===c.journey)throw new Error('Connect your earlier traveller first.');return c.signup(inputValue('account-username'),inputValue('account-password'),inputValue('account-name'),legacy.record.token)});
+document.querySelector('#account-resume').onclick=()=>accountAction(c=>c.resume());
+document.querySelector('#account-logout').onclick=()=>accountAction(async c=>{await c.logout();return null});
+document.querySelector('#account-rename').onclick=()=>accountAction(c=>c.name(inputValue('account-name')));
+document.querySelector('#account-password-save').onclick=()=>accountAction(c=>c.changePassword(inputValue('account-password'),inputValue('account-username'),inputValue('account-new-password')));
+document.querySelector('#account-key').onclick=()=>accountAction(c=>c.recoveryKey());
+document.querySelector('#account-recover').onclick=()=>accountAction(c=>c.recover(inputValue('account-public-id'),inputValue('account-recovery'),inputValue('account-username'),inputValue('account-new-password')));
+document.querySelector('#account-delete').onclick=()=>accountAction(async c=>{await c.anonymise(inputValue('account-delete-confirmation'));return null});
+for(const [id,mode] of [['account-google','login'],['account-link','link'],['account-google-upgrade','migrate']])document.querySelector(`#${id}`).onclick=()=>accountAction(async c=>{
+  if(journeyClient?.record?.pending)throw new Error('Retry your pending move first.');
+  const url=await c.startGoogle(mode,inputValue('account-name'),mode==='migrate'?getJourneyClient().record?.token:null);location.assign(url);
+});
+const oauthParams=new URLSearchParams(location.search),hasOAuth=oauthParams.has('state')&&(oauthParams.has('code')||oauthParams.has('error'));
+if(hasOAuth){
+  // Remove authorization data before any share action or further navigation.
+  history.replaceState(null,'',location.pathname+location.hash);openJourney();
+  void accountAction(c=>c.completeGoogle(oauthParams));
+}else if(initial.generation===5){
   openJourney();
   if(G5_API_URL){
     try{const snapshot=getJourneyClient().snapshot;if(snapshot){applyJourney({snapshot,conflict:false});game.notice='Last confirmed saved room · reconnecting…';game.sync();}}
     catch(error){journeyMessage.textContent=error.message;}
-    void connectJourney();
+    if(getAccountClient().session)void accountAction(c=>c.resume());
+    else journeyMessage.textContent='Sign in or use an earlier recovery code to resume your saved journey.';
   }
 }
 // Keep simulation timing independent from painting. Some mobile browsers reduce

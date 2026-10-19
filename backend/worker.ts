@@ -1,13 +1,12 @@
 // The deployed mathematical engine is imported directly, never reimplemented.
 import { START, targets, encodePath, decodePath } from '../engine.js';
+import { ApiError } from './http';
+import { authenticate, accountRoute, type AccountEnv } from './accounts';
 
 type Traveller = { id: string; active_path: string; revision: number };
 type Visit = { path: string; canonical_path: string; parent_path: string | null; a: number; b: number; c: number; discovered_at: string };
 type Command = { request_id: string; expected_revision: number; action: string; door: number | null; result_path: string };
 type DB = D1DatabaseSession;
-class ApiError extends Error {
-  constructor(public status: number, public code: string) { super(code); }
-}
 function fail(status: number, code: string): never { throw new ApiError(status, code); }
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 async function hash(value: string) {
@@ -45,7 +44,7 @@ function visitJSON(v: Visit) {
     triple: [v.a,v.b,v.c], discoveredAt: v.discovered_at, worldFloor: null };
 }
 async function findTraveller(db: DB, tokenHash: string) {
-  return db.prepare('SELECT id,active_path,revision FROM travellers WHERE token_hash=?').bind(tokenHash).first<Traveller>();
+  return authenticate(db,tokenHash);
 }
 async function exploration(db: DB) {
   // One read transaction: derived counts, never independently incremented totals.
@@ -55,13 +54,16 @@ async function exploration(db: DB) {
       (SELECT count(DISTINCT traveller_id) FROM visits) AS contributors,
       (SELECT count(*) FROM visits) AS contributions`),
     db.prepare(`SELECT generation,root_triple AS rootTriple,path,canonical_path AS canonicalPath,
-      parent_path AS parentPath,a,b,c,first_discovered_at AS firstDiscoveredAt
-      FROM discoveries ORDER BY first_discovered_at DESC,canonical_path LIMIT 10`)
+      parent_path AS parentPath,a,b,c,first_discovered_at AS firstDiscoveredAt,
+      p.public_id AS discovererId,p.display_name AS discovererName
+      FROM discoveries d JOIN profiles p ON p.traveller_id=d.first_traveller_id
+      ORDER BY first_discovered_at DESC,canonical_path LIMIT 10`)
   ]);
   // Explicit public projection: no owner IDs, credentials or personal timelines.
   return { ...totals.results[0], recentDiscoveries: recent.results.map(row => ({
     generation:row.generation,rootTriple:row.rootTriple,path:row.path,canonicalPath:row.canonicalPath,
-    parentPath:row.parentPath,triple:[row.a,row.b,row.c],firstDiscoveredAt:row.firstDiscoveredAt
+    parentPath:row.parentPath,triple:[row.a,row.b,row.c],firstDiscoveredAt:row.firstDiscoveredAt,
+    discoverer:{publicId:row.discovererId,displayName:row.discovererName}
   })) };
 }
 async function state(db: DB, id: string) {
@@ -70,20 +72,24 @@ async function state(db: DB, id: string) {
     v.path,v.canonical_path,v.parent_path,
     (SELECT count(*) FROM visits h WHERE h.traveller_id=t.id) AS history_count,
     d.first_discovered_at,d.first_traveller_id=t.id AS is_first_discoverer,
+    p.public_id AS discoverer_id,p.display_name AS discoverer_name,
     (SELECT count(*) FROM visits h WHERE h.canonical_path=v.canonical_path) AS location_travellers,
     (SELECT count(*) FROM discoveries) AS total_locations,
     (SELECT count(*) FROM (SELECT a,b,c FROM discoveries GROUP BY a,b,c)) AS unique_triples
     FROM travellers t JOIN visits v ON v.traveller_id=t.id AND v.path=t.active_path
-    JOIN discoveries d ON d.canonical_path=v.canonical_path WHERE t.id=?`)
+    JOIN discoveries d ON d.canonical_path=v.canonical_path
+    JOIN profiles p ON p.traveller_id=d.first_traveller_id WHERE t.id=?`)
     .bind(id).first<Traveller & Visit & { history_count:number; first_discovered_at:string;
-      is_first_discoverer:number; location_travellers:number; total_locations:number; unique_triples:number }>();
+      is_first_discoverer:number; location_travellers:number; total_locations:number; unique_triples:number;
+      discoverer_id:string; discoverer_name:string }>();
   if (!row) fail(404, 'traveller_not_found');
   const active = path(row.active_path);
   return { travellerId: row.id, generation: 5, geometryGeneration: 4, revision: row.revision,
     activePath: row.active_path, string: Array.from({length:active.length+1},(_,i)=>encodePath(active.slice(0,i))),
     visit: visitJSON(row), historyCount: row.history_count, worldFloor: null,
     sharedDiscovery: { canonicalPath:row.canonical_path,firstDiscoveredAt:row.first_discovered_at,
-      isFirstDiscoverer:row.is_first_discoverer===1,travellerCount:row.location_travellers },
+      isFirstDiscoverer:row.is_first_discoverer===1,travellerCount:row.location_travellers,
+      discoverer:{publicId:row.discoverer_id,displayName:row.discoverer_name} },
     exploration: { totalLocations:row.total_locations,uniqueTriples:row.unique_triples } };
 }
 function ack(c: Command) { return { requestId: c.request_id, revision: c.expected_revision + 1, activePath: c.result_path }; }
@@ -131,7 +137,7 @@ async function command(db: DB, traveller: Traveller, data: Record<string, unknow
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: AccountEnv): Promise<Response> {
     // Presentation-only entrance: API origin checks below remain unchanged.
     if (request.method === 'GET' && new URL(request.url).pathname === '/') {
       const html = `<!doctype html>
@@ -172,13 +178,26 @@ img { display: block; width: 100%; max-width: 900px; height: auto; }
       if (route === '/v1/health' && request.method === 'GET') return respond({ok:true,generation:5});
       const db = env.DB.withSession('first-primary');
       if (route === '/v1/exploration' && request.method === 'GET') return respond(await exploration(db));
+      if (route === '/v1/discovery' && request.method === 'GET') {
+        const code=url.searchParams.get('path')||'ROOT'; path(code);
+        const row=await db.prepare(`SELECT d.canonical_path,d.a,d.b,d.c,d.first_discovered_at,p.public_id,p.display_name
+          FROM discoveries d JOIN profiles p ON p.traveller_id=d.first_traveller_id WHERE d.canonical_path=?`)
+          .bind(`g5:2,2,3:${code}`).first<{canonical_path:string;a:number;b:number;c:number;first_discovered_at:string;public_id:string;display_name:string}>();
+        if (!row) fail(404,'not_found');
+        return respond({canonicalPath:row.canonical_path,triple:[row.a,row.b,row.c],firstDiscoveredAt:row.first_discovered_at,
+          discoverer:{publicId:row.public_id,displayName:row.display_name}});
+      }
       const token = request.headers.get('Authorization')?.match(/^Bearer ([0-9a-f]{64})$/)?.[1];
-      if (!token) fail(401,'credential_required');
-      const tokenHash = await hash(token);
-      let traveller = await findTraveller(db,tokenHash);
+      const tokenHash = token ? await hash(token) : null;
+      let traveller = tokenHash ? await findTraveller(db,tokenHash) : null;
+      if (route.startsWith('/v1/auth/') || route==='/v1/account' || route.startsWith('/v1/account/')) {
+        return respond(await accountRoute(request,env,db,traveller,tokenHash,ip));
+      }
+      if (!tokenHash) fail(401,'credential_required');
       if (route === '/v1/travellers' && request.method === 'POST') {
         exact(await body(request),[]);
         if (!traveller) {
+          if (String(env.ACCOUNTS_ENABLED)==='true') fail(403,'use_account_signup');
           if (String(env.REGISTRATION_ENABLED) !== 'true') fail(403,'registration_closed');
           if (!(await env.CREATE_LIMIT.limit({key:ip})).success) fail(429,'rate_limited');
           const cap = Number(env.MAX_TRAVELLERS);
