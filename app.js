@@ -149,6 +149,10 @@ function getAccountClient(){
 function accountIdentity(profile){
   document.querySelector('#account-identity').textContent=profile?`${profile.displayName} · Public traveller ID: ${profile.publicId}`:'Sign in on any device to resume the same traveller.';
   if(profile){document.querySelector('#account-public-id').value=profile.publicId;document.querySelector('#account-name').value=profile.displayName;document.querySelector('#account-username').value=profile.username||'';}
+  else{
+    for(const id of ['account-public-id','account-name','account-username'])document.querySelector(`#${id}`).value='';
+    document.querySelector('#account-key-output').textContent='';document.querySelector('#account-key-notice').hidden=true;
+  }
 }
 async function accountAction(action){
   if(g5Busy)return;g5Busy=true;journeyMessage.textContent='Working…';
