@@ -117,6 +117,31 @@ Only then may CODiE resume, confirming the actual model if visible. Do not conti
 
 No deployment authority changes: Paul alone deploys.
 
+### CODiE — 2026-10-19, local Paid-plan feasibility benchmark
+
+Pulled `codex/g5-persistence` at tested source SHA `0d1fb543b2e095aace7bbbd53a8aff60b36c6d5f`. This was local-only: `wrangler dev --local` on `127.0.0.1:8787`, disposable credentials, no remote bindings, deployment, migration or Cloudflare setting change. Each endpoint suite used 20 sequential samples; the first request after a fresh local Worker restart is labelled **cold**, and the remaining 19 are **warm**. Timings are client-observed elapsed HTTP round trips in milliseconds, including local Worker startup effects, D1 emulator work and response handling; they are not CPU measurements.
+
+**Direct scrypt in the local Workers isolate** (`N=16384,r=8,p=5`, 20 hashes): cold 109 ms; warm p50 109 ms, p95 109 ms, min 108 ms, max 109 ms, mean 108.737 ms. The temporary benchmark test passed 1/1. Wrangler emitted an existing local log-file `EPERM` warning for `...\\.wrangler\\logs\\wrangler-2026-10-19_12-26-00_976.log`; it did not fail the test. No Worker CPU duration was exposed by local Wrangler/Miniflare, so no CPU-ms figure is claimed. `process.cpuUsage()` was intentionally not used because it would measure the harness process, not isolate CPU.
+
+**Endpoint elapsed results (20 samples each; all statuses as expected):**
+
+| Operation | Cold | Warm p50 | Warm p95 | Warm min–max | Warm mean | Status |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Signup (one password hash + D1 writes) | 206.350 ms | 132.573 ms | 146.865 ms | 128.986–146.865 ms | 133.677 ms | 20× 200 |
+| Successful login (password verify) | 198.118 ms | 130.252 ms | 146.886 ms | 126.464–146.886 ms | 131.208 ms | 20× 200 |
+| Incorrect-password login (password verify) | 213.044 ms | 124.217 ms | 144.825 ms | 121.932–144.825 ms | 125.536 ms | 20× 401 |
+| Account recovery (new password hash + D1 transaction) | 201.093 ms | 129.916 ms | 141.515 ms | 125.796–141.515 ms | 130.748 ms | 20× 200 |
+
+The endpoint benchmark used unique usernames/IP headers and did not hit the application throttles. Results are a local latency baseline only; hosted CPU accounting and regional D1 latency still require Paul's approved staging test. Password parameters were not changed.
+
+**Regression checks after the benchmark:** `npm test` PASS — 5/5 files, 36/36 tests; `npm run test:client` PASS — 18/18; `npm run check` PASS. Wrangler printed only its available-update notice (4.151.1 → 4.151.2). Temporary benchmark files and disposable credential data were removed; working tree had no source changes before this note.
+
+**Cost/limit review for the £10/month target:** Cloudflare's current Workers Paid Standard pricing is a $5/month base, 10 million included requests/month, 30 million included CPU-ms/month, then $0.30/million requests and $0.02/million CPU-ms; the default per-invocation CPU limit is 30 seconds and the maximum is 5 minutes. Source: https://developers.cloudflare.com/workers/platform/pricing/ . D1 Paid includes 25 billion rows read/month, 50 million rows written/month and 5 GB storage; overages are $0.001/million read rows, $1/million written rows and $0.75/GB-month. Source: https://developers.cloudflare.com/d1/platform/pricing/ . D1 reports rows read/written and query latency in the result metadata/dashboard/GraphQL; use those counters for a real budget ledger.
+
+Current safeguards are `REQUEST_LIMIT` 120/min and `CREATE_LIMIT` 5/min in Wrangler, plus hashed D1 auth counters of 30 auth requests/IP/minute, 10 login attempts/username/15 minutes, and separate recovery/password limits. Keep registration disabled until review, keep `MAX_TRAVELLERS` conservative, retain both $5/$10 alerts, and inspect Workers CPU/request/log and D1 row metrics weekly. Alerts are notifications, not a hard spending cap. Configure a custom Worker CPU limit only after an approved hosted measurement; do not infer CPU-ms from these ~110 ms local wall times. Avoid verbose per-request logs (Workers Paid includes 20 million log events/month, then overage pricing applies).
+
+Cloudflare's Rate Limiting API supports 10- or 60-second windows and counters are location-scoped/asynchronously updated; its guidance cautions against IP-only keys because shared mobile/proxy IPs can throttle multiple valid users. Keep the existing IP guard as a coarse abuse brake, but Sara should review an identity/route-level limiter before opening registration. No complex security change was made here; if changing that architecture is required, request the manual Astra High switch first.
+
 ### CODiE — 2026-10-19, verification-only green rerun
 
 Pulled the latest `codex/g5-persistence` branch, including Sara's test-order fix. Tested commit: `03d25a9bd4a8f50ee1df033fd23d2b5c50576e13`.
