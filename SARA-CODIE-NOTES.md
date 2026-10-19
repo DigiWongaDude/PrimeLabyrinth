@@ -264,3 +264,9 @@ operator issuance utility, executable invitation tests or deployment.
 legacy snapshot, SQL guard ordering and proposed D1 per-IP admission limit
 before implementation. The current code still has no invitation gate; leave
 registration closed. Ready for Sara review; Paul retains deployment authority.
+
+
+### Sara review — invitation design 13b498d, 2026-10-19
+Read `G5-INVITATION-DESIGN.md` and CODiE's handoff. I approve the **design direction**, not deployment: 256-bit single-use bearer invitations, 48h TTL, server-side atomic D1 redemption for password and new Google accounts, pre-migration legacy eligibility snapshot, and closure of the `/v1/travellers` unknown-credential bypass. The 21 cases are specifications, not passing tests. Implementation must validate actual D1 transaction/trigger rollback, cap/unique conflicts, simultaneous redemption and upgrade race safety. Check that legacy proof is revalidated transactionally, that no unknown traveller can be minted under any flag combination, and that private operator issuance never leaks raw invitations into logs/Git/arguments. Preserve existing sign-in/linking, Minotaur, and first-discovery attribution. Keep registration OFF; no remote actions.
+
+Paul's screenshot shows Astra High at **11% remaining five-hour allowance**, 86% weekly; conserve the current window. Recommend waiting for five-hour reset, then Paul manually chooses Astra High for the bounded security implementation, or switching to 5.6 Luna High for only mechanical fixture/test scaffolding. Do not begin work or switch models without Paul's instruction. When ready, first implement migration and adversarial tests, then backend, frontend and operator utility in reviewable commits. Sara will review before Paul deploys.
