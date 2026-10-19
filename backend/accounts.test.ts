@@ -260,3 +260,24 @@ test('session rotation preserves a pending journey command and cannot restore an
   await env.DB.prepare('UPDATE sessions SET expires_at=0 WHERE token_hash=?').bind(await hash(rotated.data.token)).run();
   expect((await call('auth/rotate',{},rotated.data.token)).status).toBe(401);
 });
+
+test('Google account linking cannot complete after the initiating session is revoked',async()=>{
+  const a=await signup();
+  const attempt=await googleStart('link',a.token);
+  await mockGoogle(attempt,'revoked-link-subject');
+  expect((await call('auth/logout',{},a.token)).status).toBe(200);
+  expect((await complete(attempt,a.token)).status).toBe(401);
+  expect((await env.DB.prepare('SELECT count(*) AS n FROM accounts WHERE google_sub=?')
+    .bind('revoked-link-subject').first('n'))).toBe(0);
+});
+
+test('public discovery and exploration never expose login credentials or internal traveller IDs',async()=>{
+  const a=await signup(),internal=(await journey(a.token)).travellerId;
+  expect((await move(a.token,0)).status).toBe(200);
+  for(const endpoint of ['discovery?path=ROOT','discovery?path=0','exploration']){
+    const response=await call(endpoint);
+    expect(response.status).toBe(200);
+    const publicData=JSON.stringify(response.data);
+    for(const secret of [a.username,a.token,a.recoveryKey,internal])expect(publicData).not.toContain(secret);
+  }
+});
