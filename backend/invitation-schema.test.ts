@@ -65,8 +65,12 @@ function admission(digest,options:{id?:string;username?:string;sub?:string;cap?:
     accountInsert(session,id,options.username,options.sub),
     session.prepare("INSERT INTO visits(traveller_id,path,canonical_path,a,b,c) VALUES(?,'ROOT','g5:2,2,3:ROOT',2,2,3)").bind(id)
   ];
-  if(options.advance)statements.push(session.prepare(`INSERT INTO commands(traveller_id,request_id,expected_revision,action,door,result_path,parent_path,a,b,c)
-    VALUES(?,?,0,'advance',0,'0','ROOT',3,3,5)`).bind(id,crypto.randomUUID()));
+  if(options.advance)statements.push(
+    session.prepare(`INSERT INTO commands(traveller_id,request_id,expected_revision,action,door,result_path,parent_path,a,b,c)
+      VALUES(?,?,0,'advance',0,'0','ROOT',3,3,5)`).bind(id,crypto.randomUUID()),
+    session.prepare(`INSERT INTO commands(traveller_id,request_id,expected_revision,action,door,result_path,parent_path,a,b,c)
+      VALUES(?,?,1,'advance',0,'00','0',3,3,7)`).bind(id,crypto.randomUUID())
+  );
   statements.push(sessionInsert(session,id));
   return {id,run:()=>session.batch(statements)};
 }
@@ -153,8 +157,24 @@ test('cap exhaustion cannot silently skip traveller insertion and spend an invit
   await admission(i.digest,{cap:cap+1}).run();
 });
 
+test('competing invitations for the final cap slot commit one account and leave the loser unspent',async()=>{
+  const first=await invite(),second=await invite();
+  const count=await env.DB.prepare('SELECT count(*) AS n FROM travellers').first<number>('n');
+  const results=await Promise.allSettled([
+    admission(first.digest,{cap:count+1}).run(),admission(second.digest,{cap:count+1}).run()
+  ]);
+  expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(1);
+  expect(await env.DB.prepare('SELECT count(*) AS n FROM travellers').first('n')).toBe(count+1);
+  const loser=results[0].status==='rejected'?first:second;
+  expect(await env.DB.prepare('SELECT * FROM invitation_redemptions WHERE invite_hash=?').bind(loser.digest).first()).toBeNull();
+  await admission(loser.digest,{cap:count+2}).run();
+});
+
 test('session failure rolls back redemption, profile, account, visits, commands and discoveries',async()=>{
   const i=await invite(),a=admission(i.digest,{advance:true});
+  // Unlike ROOT/0, this path has no earlier discoverer: failure must also undo
+  // a genuinely new shared-discovery row, not only private contributions.
+  expect(await env.DB.prepare("SELECT * FROM discoveries WHERE path='00'").first()).toBeNull();
   // Locally generated UUID only, no application input or credentials in DDL.
   await env.DB.exec(`CREATE TRIGGER test_invite_session_failure BEFORE INSERT ON sessions WHEN NEW.traveller_id='${a.id}' BEGIN SELECT RAISE(ABORT,'injected_session_failure'); END;`);
   const before=await snapshot();
@@ -163,6 +183,7 @@ test('session failure rolls back redemption, profile, account, visits, commands 
     expect(await snapshot()).toEqual(before);
   }finally{await env.DB.exec('DROP TRIGGER test_invite_session_failure');}
   await a.run();
+  expect(await env.DB.prepare("SELECT first_traveller_id FROM discoveries WHERE path='00'").first('first_traveller_id')).toBe(a.id);
 });
 
 test('revocation after availability precheck is rechecked inside the redemption batch',async()=>{

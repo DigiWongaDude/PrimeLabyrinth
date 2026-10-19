@@ -47,11 +47,12 @@ constant credential rules, rate limiting, flag checks and HTTP projections.
 
 ## Executable coverage and limits
 
-20 tests exercise the actual local Workers/D1 implementation: populated migration
+21 tests exercise the actual local Workers/D1 implementation: populated migration
 and runner reapplication; preservation of credentials/ledger/discovery ownership;
 snapshot exclusions; successful transaction; missing/unknown/expired/exactly
 expired/revoked/future invitation; same-token concurrency with password/Google
-account-row combinations; username and Google-sub uniqueness rollback; cap;
+account-row combinations; username and Google-sub uniqueness rollback; cap and
+last-slot cap races;
 session failure; revocation and real clock expiry after precheck; direct insert
 guards; valid and competing upgrades; forged/stale proof; proof invalidation
 inside a batch; failed-upgrade rollback; anonymisation; immutable spent records;

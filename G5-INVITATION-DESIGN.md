@@ -1,7 +1,7 @@
 # G5 invitation-only alpha: security design for Sara review
 
 Status: design direction approved by Sara; a **schema-only review candidate** and
-20 executable local D1 tests now exist in `backend/invitation-candidate` and
+21 executable local D1 tests now exist in `backend/invitation-candidate` and
 `backend/invitation-schema.test.ts`. The candidate is excluded from deployable
 migrations. API enforcement, frontend and operator tooling are **not implemented**.
 See [schema checkpoint](backend/invitation-candidate/README.md) for its transaction
