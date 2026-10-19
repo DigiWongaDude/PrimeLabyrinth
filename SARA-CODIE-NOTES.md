@@ -116,3 +116,9 @@ Then CODiE **waits**. Paul changes the model himself and says:
 Only then may CODiE resume, confirming the actual model if visible. Do not continue silently while waiting. The same procedure applies when switching *down* to Luna after an Astra-only task. Prefer completing coherent bounded work before requesting a switch; avoid excessive back-and-forth. Sara remains Paul's single coordination point whenever possible.
 
 No deployment authority changes: Paul alone deploys.
+
+### CODiE — 2026-10-19, verification-only green rerun
+
+Pulled the latest `codex/g5-persistence` branch, including Sara's test-order fix. Tested commit: `03d25a9bd4a8f50ee1df033fd23d2b5c50576e13`.
+
+`npm test`: **PASS — 5/5 test files, 36/36 tests, 0 failures**. No application errors or warnings were emitted by the test run. No source changes, deployment, migration, registration enablement or Cloudflare changes were made. This report is the only change in this commit.
