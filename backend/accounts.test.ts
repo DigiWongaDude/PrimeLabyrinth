@@ -229,20 +229,26 @@ test('account client restores same traveller on a different device and keeps sec
   await second.logout();expect(second.session).toBeNull();expect(second.journey.record).toBeNull();
 });
 
-test('anonymisation preserves public discovery ownership without revealing old display name',async()=>{
+test('anonymisation hides the deleted profile and preserves existing discovery ownership',async()=>{
   const a=await signup(),original=await journey(a.token);
   expect((await move(a.token,0)).status).toBe(200);
+  // Other tests may already own path 0 in the shared D1 database.
   const before=await call('discovery?path=0');
-  expect(before.data.discoverer.publicId).toBe(a.profile.publicId);
+  expect(before.status).toBe(200);
+  const ownedByThisAccount=before.data.discoverer.publicId===a.profile.publicId;
   expect((await call('account/anonymise',{confirmation:'DELETE MY ACCOUNT'},a.token)).status).toBe(200);
   const after=await call('discovery?path=0');
-  expect(after.data.discoverer).toEqual({publicId:a.profile.publicId,displayName:'Anonymous traveller'});
+  expect(after.status).toBe(200);
+  expect(after.data.discoverer.publicId).toBe(before.data.discoverer.publicId);
+  expect(after.data.discoverer.displayName).toBe(
+    ownedByThisAccount?'Anonymous traveller':before.data.discoverer.displayName);
   expect(after.data.firstDiscoveredAt).toBe(before.data.firstDiscoveredAt);
   expect(after.data.canonicalPath).toBe(before.data.canonicalPath);
+  const profile=await env.DB.prepare('SELECT public_id,display_name,anonymised FROM profiles WHERE traveller_id=?')
+    .bind(original.travellerId).first();
+  expect(profile).toMatchObject({public_id:a.profile.publicId,display_name:'Anonymous traveller',anonymised:1});
   expect((await call('journey',undefined,a.token)).status).toBe(401);
-  const root=await call('discovery?path=ROOT');
-  expect(root.status).toBe(200);
-  expect(original.travellerId).toBeTruthy();
+  expect((await call('discovery?path=ROOT')).status).toBe(200);
 });
 
 test('session rotation preserves a pending journey command and cannot restore an expired session',async()=>{
