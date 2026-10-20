@@ -603,3 +603,45 @@ Stop here for Sara review.
 
 ## 2026-10-20 — Operator delegation clarification (Paul → Sara/CODiE)
 Paul explicitly authorises CODiE to execute routine **read-only remote D1 exports/backups**, private local storage, integrity checks, SHA-256 verification, and recovery documentation as part of normal safety management without separate approval each time. CODiE may run the required PowerShell commands on Outpost. Keep backups private; do not commit SQL dumps, credentials, or private data. Verify backups before reporting success. This delegation does **not** authorise database restores, remote migrations, deployments, releases, Cloudflare configuration changes, registration activation, or production changes: Paul retains those decisions and performs deployments from GitHub. Proceed with the prepared staging backup runbook, capture before/after table counts, and report results in the handoff. Do not mistake a backup for approval to migrate.
+
+### CODiE to Sara — confirmed Pages origin pre-deployment check, 2026-10-20
+
+Validated the confirmed Pages frontend origin and staging Worker configuration
+locally. No Worker/Pages deployment, remote migration, restore, remote SQL,
+Cloudflare setting/secret change, Google configuration or account-flag change
+was performed.
+
+**CHANGE:** `wrangler.staging.jsonc` now allowlists the confirmed origin
+`https://between-g5-preview.pages.dev` and preserves the existing staging API
+origin `https://between-g5-staging-api.digiwongadude.workers.dev`. The stale
+unconfirmed branch-alias candidate was removed. `ACCOUNTS_ENABLED=false` and
+`REGISTRATION_ENABLED=false` remain explicit.
+
+**TESTED COMMIT:** `01ad5e09e0b4b4b2e218f84eb3a9871f2d4b4a24`
+
+**CHECKS ACTUALLY RUN:**
+
+- `npm run test:client`: **23/23 PASS**, exit 0.
+- `npm test`: **71/71 PASS**, 7/7 files, exit 0.
+- `npm run check`: PASS, exit 0.
+- `npm run build:api`: PASS, dry-run only, 73.34 KiB / 19.72 KiB gzip.
+- `npx wrangler d1 migrations list between-g5-staging --local --config .\\wrangler.staging.jsonc`:
+  PASS, read-only local inspection; migration order is 0001_journeys,
+  0002_shared_exploration, 0003_accounts, 0004_invitations. No remote migration
+  was run.
+- `npx wrangler deploy --config .\\wrangler.staging.jsonc --dry-run --outdir .worker-build/staging`:
+  PASS, dry-run only, 73.34 KiB / 19.72 KiB gzip; staging D1 binding resolved,
+  `nodejs_compat` and compatibility date `2026-10-18` resolved, confirmed
+  Pages/API origins present, and both account flags false.
+- `git diff --check`: PASS with normal LF-to-CRLF conversion notices.
+
+**OUTSTANDING BLOCKERS / HUMAN ACTIONS:**
+
+- Remote D1 backup and verification remain pending a Cloudflare-authenticated
+  Wrangler session. The earlier unauthenticated attempt was stopped before the
+  export began; no SQL dump exists and the private backup directory is empty.
+- Paul still controls the remote migration/Worker deployment and must keep both
+  flags closed for the next smoke gate. Google OAuth values/secrets remain
+  unset, and hosted invitation issuance/delivery remains **NOT YET SOLVED**.
+- The final handoff commit follows this tested config commit; no production or
+  staging deployment was performed.
