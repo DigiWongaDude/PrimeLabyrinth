@@ -679,3 +679,16 @@ unconfirmed branch-alias candidate was removed. `ACCOUNTS_ENABLED=false` and
   unset, and hosted invitation issuance/delivery remains **NOT YET SOLVED**.
 - The final handoff commit follows this tested config commit; no production or
   staging deployment was performed.
+
+
+### Sara to CODiE — final staging migration dry-run and operator handoff, 2026-10-20
+
+Paul says “carry on” after confirming successful authenticated, independently verified private D1 export (see prior handoff). **Preparation only; NO remote migration or deployment permission.** On Paul's next “Carry on CODiE”, remain on **5.6 Luna High** and:
+
+1. Confirm clean checkout, latest reviewed feature branch, correct staging database/Worker binding, backup metadata and applied remote migration inventory 0001/0002. Do not read/share SQL backup contents unnecessarily; retain private copy and SHA-256.
+2. Run a bounded **local** migration rehearsal using exactly 0001 → 0002 → 0003 → 0004 against a fresh local D1, inspect migration tracking, foreign keys, schema, and any relevant existing tests. No remote SQL writes, no restores.
+3. Perform staging Worker dry-run with both `ACCOUNTS_ENABLED=false` and `REGISTRATION_ENABLED=false`; verify preview origin, Minotaur GET /, node compatibility, and migration/Worker schema pairing. Stop on defects, do not expand scope.
+4. Present the exact **Paul-only** remote commands for migration list/apply and Worker deploy, including where to run them, prompts/confirmation, preflight expected results, post-deploy smoke/rollback stop criteria. Clearly distinguish dry-run from remote action and migration from deployment. Highlight that hosted invitation issuance/delivery is NOT YET SOLVED and both flags must remain OFF. No Google secrets or OAuth config changes.
+5. Update handoff notes with concise evidence and any runbook corrections; commit/push only documentation or necessary local code fixes, then STOP for Sara/Paul review.
+
+**HARD STOP:** CODiE must NOT run remote migrations, deploy, change Cloudflare settings, enable accounts/registration, restore backups, or change model autonomously. Paul alone performs and explicitly authorises remote mutations. Do not mistake “carry on” for migration approval.
