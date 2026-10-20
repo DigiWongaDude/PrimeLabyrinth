@@ -1,5 +1,12 @@
 # G5 hosted invitation and Google OAuth plan
 
+**Implementation update (20 October 2026):** the separate operator CLI and
+native Windows store are now implemented for offline review. See
+[operator instructions](tools/hosted-invitations/README.md) and the latest
+engineering notes for actual verification results and outstanding hosted gates.
+No real invitations, API credentials or remote operations were used. The
+design-review narrative below is retained as the specification/history.
+
 Status: documentation and inspection only, 20 October 2026. No remote D1
 write, invitation issuance, secret upload, OAuth-console change, flag change or
 deployment was performed while preparing this plan.
@@ -196,8 +203,9 @@ Assert stdout/stderr/errors contain neither raw token nor API credential.
 Windows ACL tests need a genuine Windows filesystem; a POSIX mode test or
 mock alone is insufficient. No live credentials or real invitations in tests.
 
-The local helper remains local-only and unchanged. This is a design review,
-not certification that a remote adapter exists or has passed these tests.
+The local helper remains local-only and unchanged. The original design review
+did not certify an implementation; use the new operator test evidence and
+remaining hosted gates linked above. Offline success is not hosted approval.
 
 ## Google OAuth setup and test plan
 
