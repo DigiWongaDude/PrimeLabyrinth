@@ -668,6 +668,32 @@ then completed successfully and their outputs are in the private evidence.
 The SQL exports and evidence remain outside Git and must not be pasted, shared
 or uploaded. Worker deployment and all account flags remain Paul-controlled.
 
+### CODiE — G5 staging Worker deployed and closed-state smoke passed, 2026-10-20
+
+Paul explicitly approved the staging Worker deployment after the preflight and
+dry-run. No production deployment, OAuth change, registration activation or
+flag change was performed.
+
+- Command: `npx wrangler deploy --config .\\wrangler.staging.jsonc`
+- Worker: `between-g5-staging-api`
+- Version ID: `77599eca-33d6-4b27-8dca-5ee92fdea713`
+- D1 binding resolved to `between-g5-staging`.
+- `ACCOUNTS_ENABLED="false"` and `REGISTRATION_ENABLED="false"` remained
+  closed; Google client values remained unset.
+
+**Post-deployment read-only smoke:**
+
+- `GET /`: HTTP **200**; Minotaur asset marker present.
+- `GET /v1/health` with Origin
+  `https://between-g5-preview.pages.dev`: HTTP **200**, body
+  `{"ok":true,"generation":5}`, and matching
+  `access-control-allow-origin`.
+- `GET /v1/auth/config` with the confirmed Pages Origin: HTTP **503**,
+  `{"error":"accounts_disabled"}`.
+
+Staging is deployed in the safe closed state. Stop here for Sara/Paul review
+before any account or registration enablement.
+
 ### CODiE to Sara — confirmed Pages origin pre-deployment check, 2026-10-20
 
 Validated the confirmed Pages frontend origin and staging Worker configuration
