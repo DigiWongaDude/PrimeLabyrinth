@@ -7,7 +7,7 @@ import {
   expireInvitationRequests, redactClosedInvitationRequests, recordInvitationIssued, recordInvitationIssuanceUnknown, recordOutboxResult,
   rejectInvitationRequest
 } from './invitation-requests';
-import { deliverOutbox, fakeMailProvider, ionosRelayProvider } from './invitation-mail';
+import { cloudflareEmailProvider, deliverOutbox, fakeMailProvider, ionosRelayProvider } from './invitation-mail';
 import { invitationDigest } from './invitations';
 import { randomToken } from './accounts';
 
@@ -130,6 +130,7 @@ test('fake provider runner delivers ACKs and invitations without persisting the 
   const provider = fakeMailProvider();
   const ack = await env.DB.prepare("SELECT id FROM invitation_request_outbox WHERE request_id=? AND kind='ACK'").bind(row!.id).first<{id:string}>();
   expect((await deliverOutbox(env.DB.withSession('first-primary'),ack!.id,provider.provider))?.status).toBe('SENT');
+  expect(await deliverOutbox(env.DB.withSession('first-primary'),ack!.id,provider.provider)).toBeNull();
   await approveInvitationRequest(env.DB.withSession('first-primary'),row!.id,'paul-local-test');
   const invitationOutbox = await env.DB.prepare("SELECT id FROM invitation_request_outbox WHERE request_id=? AND kind='INVITATION'").bind(row!.id).first<{id:string}>();
   const raw = randomToken(), invitationId = crypto.randomUUID();
@@ -168,6 +169,37 @@ test('IONOS relay treats rejection, timeout and missing receipts conservatively'
   const noReceipt = ionosRelayProvider({endpoint:'https://relay.example.test/send',relaySecret:'relay-fixture-secret-32-bytes',fetcher:async()=>Response.json({accepted:true},{status:202})});
   expect(await noReceipt.send(message)).toEqual({outcome:'unknown',errorCode:'ionos_relay_no_receipt'});
   expect(()=>ionosRelayProvider({endpoint:'http://relay.example.test/send',relaySecret:'relay-fixture-secret-32-bytes'})).toThrow('ionos_relay_https_required');
+});
+
+test('native Cloudflare Email Service adapter pins the sender and keeps ACK content token-free', async () => {
+  const calls: Array<Record<string, unknown>> = [];
+  const provider = cloudflareEmailProvider({send: async message => {
+    calls.push(message);
+    return {messageId:'cf-email-fixture-1'};
+  }});
+  const result = await provider.send({requestId:'33333333-3333-4333-8333-333333333333',kind:'ACK',templateKey:'invitation_request_received_v1',recipient:'traveller@example.test',idempotencyKey:'c'.repeat(64),attempts:1});
+  expect(result).toEqual({outcome:'sent',providerMessageId:'cf-email-fixture-1'});
+  expect(calls).toEqual([{to:'traveller@example.test',from:'invitations@digiwongadude.com',subject:'THE BETWEEN — request received',text:expect.not.stringContaining('traveller@example.test')}]);
+});
+
+test('native Cloudflare adapter handles restrictions, transient errors, missing receipts and invitation secrecy', async () => {
+  const message = {requestId:'44444444-4444-4444-8444-444444444444',kind:'ACK' as const,templateKey:'invitation_request_received_v1',recipient:'traveller@example.test',idempotencyKey:'d'.repeat(64),attempts:1};
+  const rejected = cloudflareEmailProvider({send: async () => { throw Object.assign(new Error('suppressed'),{code:'E_RECIPIENT_SUPPRESSED'}); }});
+  expect(await rejected.send(message)).toEqual({outcome:'failed',errorCode:'cloudflare_recipient_suppressed'});
+  const senderRestricted = cloudflareEmailProvider({send: async () => { throw Object.assign(new Error('sender'),{code:'E_SENDER_NOT_VERIFIED'}); }});
+  expect(await senderRestricted.send(message)).toEqual({outcome:'failed',errorCode:'cloudflare_sender_not_verified'});
+  const transient = cloudflareEmailProvider({send: async () => { throw Object.assign(new Error('busy'),{code:'E_RATE_LIMIT_EXCEEDED'}); }});
+  expect(await transient.send(message)).toEqual({outcome:'unknown',errorCode:'cloudflare_rate_limited'});
+  const timeout = cloudflareEmailProvider({send: async () => { throw new Error('connection closed after accept'); }});
+  expect(await timeout.send(message)).toEqual({outcome:'unknown',errorCode:'cloudflare_email_exception'});
+  const noReceipt = cloudflareEmailProvider({send: async () => ({messageId:''})});
+  expect(await noReceipt.send(message)).toEqual({outcome:'unknown',errorCode:'cloudflare_email_no_receipt'});
+  const invitationToken = 'e'.repeat(64), captured: Array<{text:string}> = [];
+  const invitation = cloudflareEmailProvider({send: async payload => { captured.push(payload); return {messageId:'cf-invitation-1'}; }});
+  expect(await invitation.send({...message,kind:'INVITATION',templateKey:'invitation_delivery_v1',privateToken:invitationToken})).toEqual({outcome:'sent',providerMessageId:'cf-invitation-1'});
+  expect(captured[0].from).toBe('invitations@digiwongadude.com');
+  expect(captured[0].text).toContain(invitationToken);
+  expect(await invitation.send({...message,kind:'INVITATION',templateKey:'invitation_delivery_v1'})).toEqual({outcome:'failed',errorCode:'private_token_required'});
 });
 
 test('rejection is operator-only and approved issuance/delivery states are durable', async () => {

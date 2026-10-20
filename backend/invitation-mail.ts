@@ -13,6 +13,20 @@ export type MailMessage = {
 };
 export type MailProvider = { send(message: MailMessage): Promise<ProviderResult> };
 
+/**
+ * Minimal structural type for the native Cloudflare Email Service binding.
+ * Keeping this structural makes the provider easy to fake in local tests and
+ * avoids importing a platform-only runtime class into the durable outbox code.
+ */
+export type CloudflareEmailBinding = {
+  send(message: {
+    to: string;
+    from: string;
+    subject: string;
+    text: string;
+  }): Promise<{ messageId: string }>;
+};
+
 export type IonosRelayOptions = {
   /** Paul-approved HTTPS endpoint for a separately hosted relay. */
   endpoint: string;
@@ -37,6 +51,83 @@ function relayTemplate(message: MailMessage) {
     text: 'Your invitation is enclosed as a one-use code. Do not forward it.'
   };
   throw new Error('unknown_mail_template');
+}
+
+function nativeTemplate(message: MailMessage) {
+  const template = relayTemplate(message);
+  if (message.kind === 'INVITATION') {
+    if (!message.privateToken || !/^[0-9a-f]{64}$/.test(message.privateToken)) throw new Error('private_token_required');
+    // The token exists only in this in-memory provider call. It is not part of
+    // the outbox row, a URL, a log, or a provider receipt.
+    return {...template, text: `${template.text} Code: ${message.privateToken}`};
+  }
+  return template;
+}
+
+const CLOUD_FLARE_DEFINITIVE_CODES = new Set([
+  'E_VALIDATION_ERROR', 'E_FIELD_MISSING', 'E_TOO_MANY_RECIPIENTS',
+  'E_TOO_MANY_ATTACHMENTS', 'E_SENDER_NOT_VERIFIED',
+  'E_RECIPIENT_NOT_ALLOWED', 'E_RECIPIENT_SUPPRESSED',
+  'E_SENDER_DOMAIN_NOT_AVAILABLE', 'E_CONTENT_TOO_LARGE',
+  'E_HEADER_NOT_ALLOWED', 'E_HEADER_USE_API_FIELD',
+  'E_HEADER_VALUE_INVALID', 'E_HEADER_VALUE_TOO_LONG',
+  'E_HEADER_NAME_INVALID', 'E_HEADERS_TOO_LARGE', 'E_HEADERS_TOO_MANY'
+]);
+
+function cloudflareErrorCode(error: unknown) {
+  const code = error && typeof error === 'object' && 'code' in error
+    && typeof (error as {code?: unknown}).code === 'string'
+    ? (error as {code: string}).code : '';
+  if (CLOUD_FLARE_DEFINITIVE_CODES.has(code)) return `cloudflare_${code.slice(2).toLowerCase()}`;
+  // Delivery, quota, rate-limit and service errors may have been accepted at
+  // the provider boundary. Keep them UNKNOWN so the operator reconciles the
+  // message ID/activity log before any retry.
+  if (code === 'E_DELIVERY_FAILED') return 'cloudflare_delivery_failed';
+  if (code === 'E_RATE_LIMIT_EXCEEDED') return 'cloudflare_rate_limited';
+  if (code === 'E_DAILY_LIMIT_EXCEEDED') return 'cloudflare_daily_limit';
+  if (code === 'E_INTERNAL_SERVER_ERROR') return 'cloudflare_service_error';
+  return 'cloudflare_email_exception';
+}
+
+/**
+ * Native Cloudflare Email Service binding adapter. The binding's
+ * `allowed_sender_addresses`/`destination_address` restrictions are part of
+ * Wrangler configuration; this adapter additionally pins the application
+ * sender and fixed templates. A returned messageId means Email Service
+ * accepted the request, not that the recipient received it.
+ */
+export function cloudflareEmailProvider(binding: CloudflareEmailBinding): MailProvider {
+  return {
+    async send(message) {
+      let template: {subject:string; text:string};
+      try { template = nativeTemplate(message); }
+      catch (error) {
+        return {outcome:'failed', errorCode: error instanceof Error && error.message === 'private_token_required'
+          ? 'private_token_required' : 'unknown_mail_template'};
+      }
+      let result: {messageId: string};
+      try {
+        result = await binding.send({
+          to: message.recipient,
+          from: 'invitations@digiwongadude.com',
+          subject: template.subject,
+          text: template.text
+        });
+      } catch (error) {
+        const code = cloudflareErrorCode(error);
+        return code === 'cloudflare_email_exception' || code.startsWith('cloudflare_delivery_')
+          || code.startsWith('cloudflare_rate_') || code.startsWith('cloudflare_daily_')
+          || code.startsWith('cloudflare_service_')
+          ? {outcome:'unknown', errorCode:code}
+          : {outcome:'failed', errorCode:code};
+      }
+      const providerMessageId = result && typeof result.messageId === 'string' ? result.messageId : '';
+      if (!providerMessageId || providerMessageId.length > 255 || /[\u0000-\u001f\u007f]/.test(providerMessageId)) {
+        return {outcome:'unknown', errorCode:'cloudflare_email_no_receipt'};
+      }
+      return {outcome:'sent', providerMessageId};
+    }
+  };
 }
 
 function relayUrl(value: string) {

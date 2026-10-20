@@ -104,6 +104,76 @@ privilege, provide a disposable test recipient, and approve retention and
 DNS/SPF/DKIM/DMARC checks. No provider is selected or configured by this
 commit.
 
+### Native Cloudflare Email Service preparation (local only)
+
+The preferred lower-complexity route, if the zone prerequisite is satisfied,
+is the native Workers Email Service binding. `backend/invitation-mail.ts`
+contains a typed `cloudflareEmailProvider` that implements the existing
+`MailProvider` contract. It pins the application sender to
+`invitations@digiwongadude.com`, emits only fixed templates, passes invitation
+tokens only in the approved in-memory invitation call, and never writes a
+token to D1, a URL, logs, or receipts. The adapter is not wired into a live
+route and no binding was contacted in this assignment.
+
+`wrangler.staging.jsonc` now contains a prepared-but-unactivated configuration:
+`EMAIL_ACK` permits only the fixed sender, while `EMAIL_REVIEW` additionally
+fixes the destination to the Paul review mailbox. These are source-level
+restrictions only; Email Sending domain onboarding, binding availability and
+any deployment remain separate Paul approvals. Public ACK recipients are not
+pre-verified by this binding; the sender restriction is enforced, while
+Cloudflare's suppression/recipient policy still applies. A disposable,
+Paul-controlled recipient is required for the first real smoke.
+
+Cloudflare's Workers API returns an `EmailSendResult.messageId`, which is an
+acceptance receipt/unique email ID, not proof that the recipient received the
+message. The provider maps definitive validation/sender/recipient restriction
+errors to `FAILED`; rate limits, delivery failures, service exceptions and
+missing receipts become `UNKNOWN`. There is no blind retry. Reconciliation
+must use the Cloudflare Email Service Activity log or an explicitly approved
+event-subscription consumer before retrying an ambiguous row. No direct
+message-status lookup was assumed or tested locally.
+
+#### DNS and privacy prerequisite checklist (read-only)
+
+Before onboarding anything, Paul should capture evidence without editing DNS:
+
+1. In the Cloudflare account, confirm `digiwongadude.com` is an active zone
+   and its authoritative nameservers are Cloudflare nameservers. If it is not,
+   native Email Service is blocked; use the separately hosted IONOS relay or
+   another approved HTTP provider instead.
+2. Record the current apex MX, SPF TXT, DKIM selectors and `_dmarc` policy,
+   including the existing IONOS mailbox/forwarding arrangement. Do not touch
+   root MX or enable Email Routing.
+3. Review Email Sending onboarding as a preview only. Cloudflare requires
+   Cloudflare-managed DNS and onboarding may add a `cf-bounce` MX, SPF, DKIM
+   and apex `_dmarc`; those records must be checked for conflicts with IONOS
+   and the current DMARC policy before any approval.
+4. Inspect the Email Service privacy/preview setting. New sending domains have
+   Email preview enabled by default and the Activity log can retain message
+   content for about seven days. Disable preview before any invitation token
+   can be sent. For an ACK-only disposable smoke, Paul must explicitly decide
+   whether the PII exposure is acceptable; this code makes no such decision.
+
+Cloudflare docs: [Workers Email API](https://developers.cloudflare.com/email-service/api/send-emails/workers-api/),
+[send bindings](https://developers.cloudflare.com/email-service/configuration/send-bindings/),
+[domain configuration](https://developers.cloudflare.com/email-service/configuration/domains/),
+[Activity log](https://developers.cloudflare.com/email-service/observability/logs/),
+and [suppression lists](https://developers.cloudflare.com/email-service/concepts/suppressions/).
+
+#### Exact approval checklist for one real ACK
+
+Paul must approve each item separately: (1) the read-only zone/MX/SPF/DKIM/
+DMARC evidence and the decision not to enable Email Routing; (2) Email Sending
+onboarding for the exact domain; (3) the `EMAIL_ACK`/`EMAIL_REVIEW` binding
+names and restrictions; (4) Email preview disabled before any invitation
+token, or an explicitly approved disposable ACK-only preview; (5) one
+Paul-controlled disposable recipient; (6) a staging deployment with all
+account, registration and invitation-request flags still OFF; (7) verification
+of the returned message ID and Cloudflare Activity/event result; (8) the
+spending/rate-limit guard and a rollback plan. No item authorises a production
+deployment, migration, flag change, registration enablement, invitation
+issuance, DNS edit or additional email.
+
 ### IONOS first-mail recommendation
 
 The lowest-complexity safe route for the existing mailbox is **not direct SMTP
