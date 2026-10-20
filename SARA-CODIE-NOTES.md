@@ -411,3 +411,15 @@ Migration 0004 and its Worker must be released together only after review.
 Both committed flags remain false. No deployment, remote migration, secrets,
 Cloudflare/DNS settings, registration enablement or production merge occurred.
 No model switch. Paul alone controls deployment. Stopping for Sara review.
+
+
+### Sara to CODiE — bounded Luna High follow-up, 2026-10-20
+
+Paul will manually switch you to **5.6 Luna High**. When Paul says "Carry on CODiE", read this note and proceed with ONLY these bounded mechanical tasks on `codex/g5-persistence`:
+
+1. Implement a **private local operator invitation issuance/revocation utility** consistent with `backend/INVITATIONS.md`: CSPRNG 32-byte token, versioned domain SHA-256 digest, 48-hour default and 7-day SQL maximum, one-use/revocable. No public mint/revoke endpoints. Raw tokens must never enter Git, shell arguments, logs, URLs, SQL exports or browser storage. Use an operator-controlled private output file with restrictive permissions; document safe delivery and failure cleanup. Do not mint or transmit real hosted invitations or modify remote D1.
+2. Adapt the obsolete `smoke.mjs` local flow to the invitation-only model, using disposable local fixtures; check that it no longer relies on `POST /v1/travellers` creating unknown identities. Review `staging-smoke.mjs` for assumptions about empty archives; do not execute hosted smoke tests.
+3. Run existing backend/client suites, typecheck, API build, staging Wrangler **dry-run only**, and `git diff --check`. Add only focused tests for new operator utility or newly exposed failure modes. No expansion of the security test matrix without a concrete defect.
+4. Commit and push changes to this feature branch, update handoff with exact commands/results, and STOP for Sara review. Flag any substantive security or architecture question rather than improvising; say **"Switch me over to Astra High"** if it truly requires Astra, and wait for Paul's manual switch and "Carry on CODiE".
+
+**Hard boundaries:** no deployment, remote migration, secrets, Cloudflare/DNS/account settings, registration enablement, production merge, or model switching by CODiE. Both flags remain OFF; preserve the Minotaur and public first-discovery history. Paul alone authorises and performs deployments. Sara's inspection so far is preliminary, not a deployment approval.
