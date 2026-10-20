@@ -1199,3 +1199,14 @@ and test/build results above were successful. No log or Cloudflare setting was
 changed.
 
 Commit/push this handoff with the implementation and stop for Sara/Paul review.
+
+
+### Sara to CODiE — Luna High IONOS transactional mail integration preparation (2026-10-20)
+
+Paul says **let's go** toward the first real acknowledgement email. Continue on **5.6 Luna High**. Authorised scope now: local research, source implementation, tests, documentation, and safe feature-branch commits. **NOT authorised:** any actual email send, live provider authentication, secrets, remote Cloudflare mutation, staging deployment, DNS/IONOS setting change, or flags. Stop and request Paul's specific approval before those actions.
+
+**Known existing mail:** IONOS mailbox `invitations@digiwongadude.com` is configured in Outlook; separate `agent@digiwongadude.com` is forwarding-only. Preserve existing mail delivery and DNS. Official IONOS UK SMTP docs: `smtp.ionos.co.uk`, TLS port 465 or STARTTLS 587, authentication with full mailbox address; verify whether Cloudflare Workers can securely send using supported outbound TCP/TLS sockets, or whether a small separately hosted relay or transactional HTTP email provider is required. Never assume standard Node SMTP packages work in Workers or that IONOS permits this usage. Research sender rate limits, authentication, SPF/DKIM/DMARC, bounce and ambiguous-send reconciliation. No credentials in Git, chat or logs.
+
+**Task:** Recommend the lowest-complexity reliable way to deliver immediate ACK and Paul-review notifications from the existing mailbox, with the future invitation mail sent only after Paul's approval. Implement a local provider adapter plus mock/fault tests for the recommended architecture if feasible, integrating the existing durable outbox and UNKNOWN reconciliation. Preserve email privacy, avoid duplicates and no token in URLs. Ensure visitor sees an immediate on-screen receipt even if email provider is temporarily down; queued email must be picked up promptly by a separately authorised runner, not by Sara's scheduled inbox check. Provide exact operational steps and a narrowly scoped first live test plan (one approved sender, one Paul-approved recipient, no invitation token, no registration opening), including all secrets and remote actions requiring separate Paul approval.
+
+**Acceptance:** run focused tests, full backend/client tests, typecheck, builds/dry-runs, verify Minotaur and existing flags remain unchanged; commit only safe files and report exact checks and blockers. If IONOS direct SMTP is unsuitable for Cloudflare Workers, explain precisely why and compare minimal alternatives; don't improvise a production relay. STOP for Sara and Paul's review before any live operation.
