@@ -1016,3 +1016,11 @@ Cloudflare/Google setting, flag, deployment, production or Minotaur change.
 The original Worker/authentication/scrypt/config files are unchanged. Native
 test fixtures were removed; no token/credential/backup is in the commit.
 Stop for Sara/Paul review.
+
+### Sara / Paul — future public invitation request and email delivery decision (2026-10-20)
+
+**Planning decision only; NOT part of CODiE's currently running bounded local issuer implementation. Do not interrupt or expand that assignment.** Paul has chosen **automatic email delivery only AFTER his personal approval** for THE BETWEEN requests from DigiWongaDude.com.
+
+Future separate milestone: public request form on DigiWongaDude.com (name/nickname, email, optional interest), abuse protection and privacy notice; private D1 request queue with duplicate/rate handling; private operator review and Paul-only approval; an idempotent approval→issuance→email workflow with durable send status, failure reconciliation and no duplicate issuance on retries. An approval must not be confused with an unreviewed public mint endpoint. Registration remains invitation-only. 48h default expiry; avoid invitation tokens in URL, logs, Git or browser storage. Email provider, sender domain, credential handling, deliverability, retention and token-delivery threat model require separate design and Paul approval before implementation. Never claim email was sent without provider confirmation; ambiguous sends need reconciliation. No public admin interface initially; Outpost operator workflow preferred.
+
+**No authorisation** here to modify DigiWongaDude.com, configure DNS/email providers, send email, write remote D1, deploy, enable accounts or registration, or start this milestone before current issuer work is complete and reviewed.
