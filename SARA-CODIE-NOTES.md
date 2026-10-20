@@ -479,3 +479,18 @@ mobile/browser visual QA, secure hosted invitation delivery, independent
 security review and deployment. `staging-smoke.mjs` was reviewed but not
 executed, as required. Stop here for Sara review; Paul retains deployment and
 remote migration authority.
+
+
+### Sara — sea-trial preflight review, 2026-10-20
+
+Read source `backend/accounts.ts`, `backend/worker.ts`, `backend/migrations/0003_accounts.sql`, `0004_invitations.sql`, `tools/invitations-local.mjs`, `smoke.mjs`, `staging-smoke.mjs`, `wrangler.staging.jsonc`, and `G5-STAGING-ACCOUNTS-RUNBOOK.md`. This is a **source-level preliminary review**, not a completed independent security audit or approval to deploy. No confirmed blocker identified in inspected admission transaction/trigger ordering, origin checks, OAuth state/nonce/PKCE, or unknown-legacy denial. CODiE's reported local suite and smoke passes are not independently rerun by Sara.
+
+**Next sequential sea-trial gates, requiring Paul's explicit actions/approval:**
+1. Confirm or create an isolated Pages preview for branch `codex/g5-persistence`, then verify actual HTTPS origin. Candidate URL in runbook is NOT confirmed; leave live website, DNS and `gh-pages` untouched.
+2. Resolve **hosted invitation issuance/delivery** separately. `tools/invitations-local.mjs` only writes to local D1; do NOT assume it issues hosted invites. Verify Windows private-file ACL for any real secret material. Do not improvise hosted issuance.
+3. Freeze reviewed commit; confirm no unresolved release blockers; make private staging D1 backup and inventory, confirm migrations/Worker compatibility. Paul alone applies remote migration/deploy with both flags OFF, then perform closed-state smoke and preservation checks.
+4. Configure Google OAuth only against the confirmed preview URI; secret only in Cloudflare secret store, Paul action.
+5. Paul-approved invitation-only limited registration window: real password, Google, second-device, legacy-upgrade and immutable discovery checks; close registration and record evidence.
+6. Production release is a later separate decision. No staging or production deployment authorised by this note.
+
+**Watchpoints:** `staging-smoke.mjs` remains unexecuted against hosted updated Worker; it assumes the source version returning `use_account_signup` for unknown legacy credentials. Do not run it against the older deployed Worker and interpret a mismatch as corruption. `G5-STAGING-ACCOUNTS-RUNBOOK.md` still contains pre-tooling language; reconcile before execution. Stop and seek security-focused review if any actual defect emerges. No further CODiE action requested yet.
