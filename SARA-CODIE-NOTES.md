@@ -813,3 +813,12 @@ perform and explicitly approve those remote actions from a clean reviewed
 checkout. Hosted invitation issuance/delivery remains **NOT YET SOLVED**;
 Google secrets/OAuth configuration remain unset; both account flags must stay
 OFF. Stop for Sara/Paul review before any remote mutation.
+
+
+### Sara to CODiE — read-only post-deploy origin and ledger smoke, 2026-10-20
+
+Paul requests tests of unauthorized origins on the now-deployed G5 staging Worker. On Paul's next “Carry on CODiE”, run **bounded read-only** hosted smoke checks against ONLY `between-g5-staging-api.digiwongadude.workers.dev` and `between-g5-staging`; do not deploy, migrate, alter flags/secrets, or create travellers/visits/discoveries. Stay on 5.6 Luna High.
+
+1. First inspect `backend/worker.ts` / `backend/http.ts` for actual origin enforcement and read-only endpoints; identify which responses are supposed to be rejected versus merely lack `Access-Control-Allow-Origin`. Avoid assuming CORS itself authenticates clients. Use GET/OPTIONS only and bounded request count, no POST/PUT/DELETE. Test `Origin: https://between-g5-preview.pages.dev` (allowed), `Origin: https://evil.example` (disallowed), and absent Origin against appropriate read-only endpoints such as `/v1/health`, `/v1/auth/config`, `/v1/discovery?path=...` only if safe and valid. Verify preflight OPTIONS behavior, status/body and ACAO header, and no wildcard/reflection. Preserve expected disabled-accounts 503. Do not confuse GET / Minotaur public entrance with protected API.
+2. Read-only inspect D1 counts of `travellers`, `visits`, `discoveries`, `world_occupancy`, `commands` and relevant public ledger; compare to the zero baseline and verify `PRAGMA foreign_key_check` clean. If any counts differ, report them; don't label changes as corruption without evidence. Verify immutable-ledger trigger definitions read-only (sqlite_master), **do not attempt write probes**. Confirm the old Minotaur GET / remains 200.
+3. Report exact URLs/Origin headers/status/CORS outcome, expected-vs-observed, remote database read-only results, and any security discrepancy. Redact private information. STOP for Sara/Paul review. Only documentation/handoff Git commit allowed. No remote changes of any kind.
