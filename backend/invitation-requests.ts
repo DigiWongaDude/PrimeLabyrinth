@@ -7,6 +7,8 @@ export type InvitationRequestEnv = AccountEnv & {
   TURNSTILE_EXPECTED_HOSTNAME?: string;
   TURNSTILE_EXPECTED_ACTION?: string;
   INVITATION_REQUESTS_ENABLED?: string;
+  /** Worker secret used for private email deduplication. Never a public var. */
+  INVITATION_REQUEST_DEDUPE_SECRET?: string;
 };
 type TurnstileReply = { success?: boolean; hostname?: string; action?: string; challenge_ts?: string };
 type RequestRow = { id:string; display_name:string; email:string; message:string; status:string; created_at:number };
@@ -50,6 +52,13 @@ function enabled(env: InvitationRequestEnv) {
 }
 function requireConfig(env: InvitationRequestEnv) {
   if (!env.TURNSTILE_SECRET || !env.TURNSTILE_EXPECTED_HOSTNAME || !env.TURNSTILE_EXPECTED_ACTION) fail(503, 'turnstile_unconfigured');
+  if (!env.INVITATION_REQUEST_DEDUPE_SECRET || env.INVITATION_REQUEST_DEDUPE_SECRET.length < 16) fail(503, 'request_security_unconfigured');
+}
+
+async function keyedDigest(secret: string, value: string) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), {name:'HMAC',hash:'SHA-256'}, false, ['sign']);
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(signature), b => b.toString(16).padStart(2, '0')).join('');
 }
 
 async function verifyTurnstile(request: Request, env: InvitationRequestEnv, token: string) {
@@ -89,7 +98,10 @@ export async function invitationRequestRoute(request: Request, env: InvitationRe
   if (typeof data.turnstileToken !== 'string') fail(403, 'turnstile_failed');
   await throttle(db, 'ip', ip, 5, 3600);
   const turnstileHash = await verifyTurnstile(request, env, data.turnstileToken);
-  const emailHash = await hash(`between:g5:invitation-request:email:v1:${address}`);
+  // A plain deterministic digest permits a dictionary attack against a D1
+  // snapshot. Keep deduplication deterministic, but require a Worker-only
+  // HMAC secret so the database alone cannot enumerate likely addresses.
+  const emailHash = await keyedDigest(env.INVITATION_REQUEST_DEDUPE_SECRET!, `between:g5:invitation-request:email:v2:${address}`);
   // Check active email/token identities before counters. A duplicate must be
   // privacy-preserving and must not be turned into a rate-limit oracle.
   const duplicate = await db.prepare(`SELECT id FROM invitation_requests
@@ -167,6 +179,26 @@ export async function expireInvitationRequests(db: DB, olderThanSeconds = 30 * 8
   const result = await db.prepare(`UPDATE invitation_requests SET status='EXPIRED',reviewed_at=unixepoch(),reviewer_reference='system_expiry'
     WHERE status='PENDING' AND created_at<=unixepoch()-?`).bind(olderThanSeconds).run();
   return { expired: result.meta.changes };
+}
+/**
+ * Redact closed moderation records after the approved retention window. This
+ * preserves the non-PII status/timestamps while preventing an old D1 backup
+ * or outbox row from retaining the requester's address/message indefinitely.
+ * It is private operator work; the public Worker never invokes it.
+ */
+export async function redactClosedInvitationRequests(db: DB, retentionSeconds = 90 * 86400) {
+  if (!Number.isSafeInteger(retentionSeconds) || retentionSeconds < 30 * 86400 || retentionSeconds > 3650 * 86400) fail(400, 'invalid_retention');
+  const cutoff = now() - retentionSeconds;
+  const result = await db.batch([
+    db.prepare(`UPDATE invitation_request_outbox SET recipient='redacted@invalid',
+      status=CASE WHEN status IN ('PENDING','SENDING','FAILED','UNKNOWN') THEN 'FAILED' ELSE status END,
+      last_error_code=CASE WHEN status IN ('PENDING','SENDING','FAILED','UNKNOWN') THEN 'retention_redacted' ELSE last_error_code END,
+      updated_at=unixepoch()
+      WHERE request_id IN (SELECT id FROM invitation_requests WHERE status IN ('REJECTED','EXPIRED') AND reviewed_at IS NOT NULL AND reviewed_at<=?)`).bind(cutoff),
+    db.prepare(`UPDATE invitation_requests SET display_name='Redacted request', email='redacted@invalid', message=''
+      WHERE status IN ('REJECTED','EXPIRED') AND reviewed_at IS NOT NULL AND reviewed_at<=?`).bind(cutoff)
+  ]);
+  return { redacted: result[1].meta.changes };
 }
 export async function claimOutbox(db: DB, outboxId: string) {
   const id = requireId(outboxId);

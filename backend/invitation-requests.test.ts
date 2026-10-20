@@ -4,15 +4,19 @@ import { beforeAll, afterEach, expect, test, vi } from 'vitest';
 import worker from './worker';
 import {
   approveInvitationRequest, claimOutbox, listPendingInvitationRequests,
-  expireInvitationRequests, recordInvitationIssued, recordInvitationIssuanceUnknown, recordOutboxResult,
+  expireInvitationRequests, redactClosedInvitationRequests, recordInvitationIssued, recordInvitationIssuanceUnknown, recordOutboxResult,
   rejectInvitationRequest
 } from './invitation-requests';
+import { deliverOutbox, fakeMailProvider } from './invitation-mail';
+import { invitationDigest } from './invitations';
+import { randomToken } from './accounts';
 
 const localEnv = () => ({...env,
   INVITATION_REQUESTS_ENABLED:'true',
   TURNSTILE_SECRET:'local-test-secret',
   TURNSTILE_EXPECTED_HOSTNAME:'localhost',
-  TURNSTILE_EXPECTED_ACTION:'invitation_request'
+  TURNSTILE_EXPECTED_ACTION:'invitation_request',
+  INVITATION_REQUEST_DEDUPE_SECRET:'local-only-dedupe-secret-32-bytes'
 });
 let sequence = 0;
 function request(data: Record<string, unknown>, ip = `198.51.100.${++sequence}`) {
@@ -41,6 +45,17 @@ test('accepts a verified request, queues acknowledgement and review, and stores 
   expect(await env.DB.prepare('SELECT kind,recipient,status FROM invitation_request_outbox WHERE request_id=(SELECT id FROM invitation_requests WHERE email=?) ORDER BY kind').bind(input.email).all()).toMatchObject({results:[
     {kind:'ACK',recipient:input.email,status:'PENDING'}, {kind:'REVIEW',recipient:'invitations@digiwongadude.com',status:'PENDING'}
   ]});
+  const emailHash = await env.DB.prepare('SELECT email_hash FROM invitation_requests WHERE email=?').bind(input.email).first<{email_hash:string}>();
+  expect(emailHash!.email_hash).not.toBe(await (async()=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(`between:g5:invitation-request:email:v1:${input.email}`))),b=>b.toString(16).padStart(2,'0')).join(''))());
+});
+
+test('request and outbox rows are atomic if the outbox statement fails', async () => {
+  await env.DB.prepare(`CREATE TRIGGER invitation_request_test_abort AFTER INSERT ON invitation_requests
+    WHEN NEW.email='batch-failure@example.test' BEGIN SELECT RAISE(ABORT,'simulated_batch_failure'); END`).run();
+  turnstile();
+  expect((await request(valid({email:'batch-failure@example.test'}))).status).toBe(503);
+  expect(await env.DB.prepare("SELECT count(*) AS n FROM invitation_requests WHERE email='batch-failure@example.test'").first('n')).toBe(0);
+  await env.DB.prepare('DROP TRIGGER invitation_request_test_abort').run();
 });
 
 test('duplicate email and replayed Turnstile token are neutral and do not create more mail', async () => {
@@ -69,6 +84,11 @@ test('Turnstile hostname, action, stale challenge and configuration failures rej
   turnstile();
   const disabled = await worker.fetch(new Request('http://api/v1/invitation-requests',{method:'POST',headers:{Origin:'http://localhost:4175','Content-Type':'application/json'},body:JSON.stringify(valid())}),{...localEnv(),INVITATION_REQUESTS_ENABLED:'false'});
   expect(disabled.status).toBe(503);
+  turnstile();
+  const noDedupeSecret = await request(valid({email:'unconfigured-dedupe@example.test'}),'198.51.100.253');
+  expect(noDedupeSecret.status).toBe(202);
+  const noSecret = await worker.fetch(new Request('http://api/v1/invitation-requests',{method:'POST',headers:{Origin:'http://localhost:4175','Content-Type':'application/json','CF-Connecting-IP':'198.51.100.254'},body:JSON.stringify(valid({email:'unconfigured-dedupe-2@example.test'}))}),{...localEnv(),INVITATION_REQUEST_DEDUPE_SECRET:undefined});
+  expect(noSecret.status).toBe(503);
 });
 
 test('validation, origin, method and privacy checks do not expose queue state', async () => {
@@ -93,6 +113,32 @@ test('approval is private, idempotent, and produces exactly one invitation workf
   expect(await listPendingInvitationRequests(env.DB.withSession('first-primary'))).not.toEqual(expect.arrayContaining([expect.objectContaining({id:row!.id})]));
   const publicAdmin = await worker.fetch(new Request(`http://api/v1/admin/invitation-requests/${row!.id}/approve`,{method:'POST',headers:{Origin:'http://localhost:4175','Content-Type':'application/json'},body:'{}'}),localEnv());
   expect(publicAdmin.status).toBe(401);
+  const raced = valid({email:'approval-race@example.test'}); await request(raced);
+  const racedRow = await env.DB.prepare('SELECT id FROM invitation_requests WHERE email=?').bind(raced.email).first<{id:string}>();
+  const approvals = await Promise.all([
+    approveInvitationRequest(env.DB.withSession('first-primary'),racedRow!.id,'paul-local-test'),
+    approveInvitationRequest(env.DB.withSession('first-primary'),racedRow!.id,'paul-local-test')
+  ]);
+  expect(approvals[0]).toMatchObject(approvals[1]);
+  expect(await env.DB.prepare('SELECT count(*) AS n FROM invitation_request_approvals WHERE request_id=?').bind(racedRow!.id).first('n')).toBe(1);
+});
+
+test('fake provider runner delivers ACKs and invitations without persisting the token', async () => {
+  turnstile();
+  const input = valid({email:'fake-provider@example.test'}); await request(input);
+  const row = await env.DB.prepare('SELECT id FROM invitation_requests WHERE email=?').bind(input.email).first<{id:string}>();
+  const provider = fakeMailProvider();
+  const ack = await env.DB.prepare("SELECT id FROM invitation_request_outbox WHERE request_id=? AND kind='ACK'").bind(row!.id).first<{id:string}>();
+  expect((await deliverOutbox(env.DB.withSession('first-primary'),ack!.id,provider.provider))?.status).toBe('SENT');
+  await approveInvitationRequest(env.DB.withSession('first-primary'),row!.id,'paul-local-test');
+  const invitationOutbox = await env.DB.prepare("SELECT id FROM invitation_request_outbox WHERE request_id=? AND kind='INVITATION'").bind(row!.id).first<{id:string}>();
+  const raw = randomToken(), invitationId = crypto.randomUUID();
+  await env.DB.prepare('INSERT INTO invitations(id,token_hash,created_at,expires_at,operator_reference) VALUES(?,?,unixepoch(),unixepoch()+3600,?)').bind(invitationId,await invitationDigest(raw),'local-test').run();
+  await recordInvitationIssued(env.DB.withSession('first-primary'),row!.id,invitationId);
+  expect((await deliverOutbox(env.DB.withSession('first-primary'),invitationOutbox!.id,provider.provider,raw))?.status).toBe('SENT');
+  expect(provider.calls).toHaveLength(2);
+  expect(provider.calls[1].tokenLength).toBe(64);
+  expect(JSON.stringify(await env.DB.prepare('SELECT * FROM invitation_request_outbox WHERE request_id=?').bind(row!.id).all())).not.toContain(raw);
 });
 
 test('rejection is operator-only and approved issuance/delivery states are durable', async () => {
@@ -133,6 +179,33 @@ test('pending requests can expire for retention and the same email can later req
   expect(await expireInvitationRequests(env.DB.withSession('first-primary'),2592000)).toEqual({expired:1});
   expect(await env.DB.prepare('SELECT status FROM invitation_requests WHERE id=?').bind(row!.id).first('status')).toBe('EXPIRED');
   expect((await request(valid({email:input.email,turnstileToken:'fresh-expiry-token'}),'198.51.100.254')).status).toBe(202);
+});
+
+test('closed request PII is redacted after retention while audit status remains', async () => {
+  turnstile();
+  const input = valid({email:'redact-me@example.test',message:'private note'}); await request(input);
+  const row = await env.DB.prepare('SELECT id FROM invitation_requests WHERE email=?').bind(input.email).first<{id:string}>();
+  await rejectInvitationRequest(env.DB.withSession('first-primary'),row!.id,'paul-local-test');
+  await env.DB.prepare('UPDATE invitation_requests SET created_at=unixepoch()-7776002, reviewed_at=unixepoch()-7776001 WHERE id=?').bind(row!.id).run();
+  expect(await redactClosedInvitationRequests(env.DB.withSession('first-primary'),90*86400)).toEqual({redacted:1});
+  const redacted = await env.DB.prepare('SELECT display_name,email,message,status FROM invitation_requests WHERE id=?').bind(row!.id).first<any>();
+  expect(redacted).toEqual({display_name:'Redacted request',email:'redacted@invalid',message:'',status:'REJECTED'});
+  expect(JSON.stringify(await env.DB.prepare('SELECT recipient FROM invitation_request_outbox WHERE request_id=?').bind(row!.id).all())).not.toContain(input.email);
+});
+
+test('local end-to-end request to account gate uses one private invitation token', async () => {
+  turnstile();
+  const input = valid({email:'e2e-gate@example.test'}); expect((await request(input)).status).toBe(202);
+  const row = await env.DB.prepare('SELECT id FROM invitation_requests WHERE email=?').bind(input.email).first<{id:string}>();
+  await approveInvitationRequest(env.DB.withSession('first-primary'),row!.id,'paul-local-test');
+  const invitationId = crypto.randomUUID(), raw = randomToken();
+  await env.DB.prepare('INSERT INTO invitations(id,token_hash,created_at,expires_at,operator_reference) VALUES(?,?,unixepoch(),unixepoch()+3600,?)').bind(invitationId,await invitationDigest(raw),'local-e2e').run();
+  await recordInvitationIssued(env.DB.withSession('first-primary'),row!.id,invitationId);
+  const cfg = {...localEnv(),ACCOUNTS_ENABLED:'true',REGISTRATION_ENABLED:'true',MAX_TRAVELLERS:'1000'};
+  const signup = (username:string, invitation:string) => worker.fetch(new Request('http://api/v1/auth/signup',{method:'POST',headers:{Origin:'http://localhost:4175','Content-Type':'application/json','CF-Connecting-IP':`198.51.100.${++sequence}`},body:JSON.stringify({username,password:'A local e2e password 123!',displayName:'E2E traveller',invitation})}),cfg);
+  expect((await signup(`e2e_${++sequence}`,raw)).status).toBe(200);
+  expect((await signup(`e2e_${++sequence}`,raw)).status).toBe(403);
+  expect(JSON.stringify(await env.DB.prepare('SELECT token_hash FROM invitations WHERE id=?').bind(invitationId).first())).not.toContain(raw);
 });
 
 test('issuance ambiguity is explicit and cannot be silently retried or minted twice', async () => {

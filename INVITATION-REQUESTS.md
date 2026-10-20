@@ -24,9 +24,19 @@ Worker:
    replays, without revealing whether an email is already queued.
 
 Raw Turnstile tokens are never stored. Request email/message data is private
-moderation data in D1 and is not returned by a public route. Before a hosted
+moderation data in D1 and is not returned by a public route. Email deduplication
+uses an HMAC-SHA-256 keyed by the Worker-only `INVITATION_REQUEST_DEDUPE_SECRET`
+(minimum 16 characters), not an unsalted public digest; the secret must be a
+Worker secret and is deliberately absent from Wrangler vars. A D1 snapshot by
+itself therefore cannot run a small-dictionary email enumeration attack. If the
+secret and snapshot are both compromised, the risk returns. Before a hosted
 launch, Paul must approve retention, access, at-rest protection and deletion
 policy for this PII.
+
+Closed requests can be redacted by the private operator function
+`redactClosedInvitationRequests` after a minimum 30-day retention window. It
+keeps status/timestamps and replaces display name, email, message and any
+unsent outbox recipient; the public Worker never calls it automatically.
 
 ## Private approval and delivery state machine
 
@@ -50,12 +60,75 @@ hosted issuer. An unknown issuance or email result is never retried blindly and
 never mints a replacement automatically.
 
 Acknowledgement and review mail are queued only in this assignment. There is
-no email API call, Outlook automation, scheduled task or live send. A future
-provider adapter must use an approved sender such as Cloudflare Email Service,
-an approved transactional provider, or Microsoft Graph for the existing
-mailbox; the choice, sender-domain authentication (SPF/DKIM/DMARC), data
-retention, idempotency key handling and secret storage all require a separate
-Paul decision. Outlook mailbox connectivity alone is not a send API contract.
+no email API call, Outlook automation, scheduled task or live send. The local
+`backend/invitation-mail.ts` provider contract claims one outbox row, passes a
+secret invitation token only in memory for the invitation adapter, and records
+`SENT`, definitive `FAILED`, or ambiguous `UNKNOWN`. Provider exceptions become
+`UNKNOWN`; there is no automatic retry or replacement token. The fake adapter
+used by tests stores only metadata and token length, never the token.
+
+The explicit future runner boundary is: automatic ACK after the durable D1
+batch, private Paul review, one hosted-issuer call, then an operator/provider
+runner. The runner must reconcile `UNKNOWN` manually before any retry. The
+issuer's native private journal remains outside Worker/D1 and returns only a
+non-secret invitation ID; an uncertain issuer call is terminal `UNKNOWN`.
+
+### Sender research (decision still required)
+
+- **Microsoft Graph:** `POST /users/{id}/sendMail` needs least-privilege
+  `Mail.Send`; application permission requires admin consent and can send as
+  any user, while delegated permission acts as the signed-in user. A 202 is an
+  accepted request, not proof of recipient delivery, so our idempotency/outbox
+  and reconciliation still remain necessary. Paul must verify that the
+  connected Outlook identity is allowed to send as
+  `invitations@digiwongadude.com`; mailbox access alone is not that grant.
+  See [Graph sendMail](https://learn.microsoft.com/en-us/graph/api/user-sendmail?view=graph-rest-1.0)
+  and the [permissions reference](https://learn.microsoft.com/en-us/graph/permissions-reference?view=graph-rest-1.0).
+- **Cloudflare Email Service:** a Worker `send_email` binding is native and can
+  restrict sender/destination addresses, but the domain must be onboarded and
+  SPF/DKIM/DMARC records are part of that setup. This would require Paul's
+  explicit Cloudflare/DNS approval and a binding secret/config review; none was
+  performed here. See [Email Service setup](https://developers.cloudflare.com/email-service/get-started/send-emails/)
+  and [send bindings](https://developers.cloudflare.com/email-service/configuration/send-bindings/).
+- **IONOS SMTP/API:** IONOS documents SMTP on TLS port 587 (465 SSL as an
+  alternative) and requires the sender address to match the authenticated
+  domain/relay rules. Forwarding is not a sending identity. Existing IONOS
+  mailbox/forwarding and SPF/DKIM/DMARC records must be checked before using
+  SMTP, because a new relay can alter deliverability or SPF alignment. See
+  [IONOS sender-address rules](https://www.ionos.com/help/email/general-topics/important-change-for-sending-emails-with-different-sender-addresses/),
+  [SMTP settings](https://www.ionos.com/help/email/glossary-email-terms-explained/smtp/),
+  and [DMARC](https://www.ionos.com/help/domains/configuring-mail-servers-and-other-related-records/configuring-a-dmarc-record-for-a-domain/).
+
+Paul must choose one provider, approve the exact sender identity and least
+privilege, provide a disposable test recipient, and approve retention and
+DNS/SPF/DKIM/DMARC checks. No provider is selected or configured by this
+commit.
+
+### Focused security review (local evidence)
+
+- **Enumeration:** fixed by the Worker-secret HMAC dedupe key and regression
+  coverage; the raw email remains moderation PII and is not returned by a
+  public read route.
+- **Atomicity/concurrency:** request plus ACK/review rows are one D1 batch;
+  an injected outbox failure rolls the request back. Approval uses the unique
+  request key and was exercised concurrently; only one approval and invitation
+  outbox item survives.
+- **Replay/unknown states:** Turnstile hashes are single-use; invitation rows
+  contain only a digest and the account trigger consumes them once. Issuer or
+  provider exceptions become `UNKNOWN` and require operator reconciliation;
+  there is no blind resend or replacement mint.
+- **IP/rate limits:** `CF-Connecting-IP` is the Cloudflare edge canonical
+  address. It is a throttling key, not authentication. The edge must overwrite
+  it and direct-origin access must be blocked; `X-Forwarded-For` is ignored.
+  D1/Rate Limit binding errors fail closed rather than accepting requests.
+- **PII:** closed records have an operator-only, minimum-30-day redaction path
+  that also removes unsent outbox recipients. Retention period, operator ACL,
+  backup lifecycle and deletion evidence still require Paul's decision.
+
+Local tests cannot prove Cloudflare edge header provenance, physical power-loss
+durability, a real Turnstile challenge, provider delivery/reconciliation, the
+hosted issuer's Windows ACL boundary on every machine, or live mailbox
+SPF/DKIM/DMARC alignment. Those remain staging acceptance gates.
 
 ## Local test configuration
 

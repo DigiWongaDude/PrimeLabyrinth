@@ -1136,3 +1136,66 @@ Paul says **carry on with the next LOCAL milestone on 5.6 Luna High**. This is p
 5. Keep public request page additive, no changes to live DigiWongaDude.com; no public admin route; no token in URLs, SQL plaintext, browser storage, logs, Git or email preview; no unsolicited real emails. Provide a realistic staging acceptance checklist and report all test commands and exact results.
 
 **Hard stops remain:** No remote Cloudflare D1 reads/writes/migrations/restore, no Worker/Pages deployment, no DNS/IONOS/Outlook/Google/Cloudflare config, no secret creation/upload, no actual mail sending, no registration/account/request flag enabling, no production changes, no remote invitation mint. Paul alone may separately authorise any such operation. Preserve GET / Minotaur and existing staging gameplay. Stay on **5.6 Luna High**; request a model switch only for a specific, evidenced blocker and let Paul decide. Commit/push only safe source, tests and docs to the feature branch, report remaining blockers, then STOP.
+### CODiE to Sara — Luna High security review and local invitation E2E (2026-10-20)
+
+**READY FOR SARA REVIEW — LOCAL ONLY.** Started from reviewed commit `9d9f2b7`.
+No live deployment, remote D1 read/write/migration/restore, secret creation or
+upload, DNS/Cloudflare/IONOS/Outlook change, flag change, email send, hosted
+issuer mint, or Minotaur change occurred.
+
+**DONE**
+
+- Replaced the invitation email's unsalted deterministic SHA-256 dedupe key
+  with HMAC-SHA-256 keyed by the Worker-only
+  `INVITATION_REQUEST_DEDUPE_SECRET` (minimum 16 characters). A D1 snapshot
+  alone cannot run a small-dictionary enumeration; missing configuration fails
+  closed with a generic 503. The secret is not a Wrangler var.
+- Added private `redactClosedInvitationRequests` with a minimum 30-day guard;
+  it preserves status/timestamps, redacts closed request fields and outbox
+  recipients, and marks unsent mail retention-redacted.
+- Added `backend/invitation-mail.ts`: explicit outbox provider contract,
+  deterministic fake adapter, in-memory-only invitation token handoff, and
+  `UNKNOWN` on provider exception. It never stores/logs the token, blindly
+  retries an uncertain send, or mints a replacement.
+- Added tests for HMAC configuration/dictionary resistance, injected D1 batch
+  rollback, concurrent approval uniqueness, PII redaction, fake ACK/invitation
+  delivery, token non-persistence, and a local end-to-end request -> fake
+  Turnstile -> durable queue -> simulated ACK -> private approval -> one fake
+  issuer token -> simulated invitation delivery -> account signup gate. The
+  same invitation is rejected on the second signup. No live email, issuer or
+  game registration is claimed.
+- Documented IP trust/rate-limit residuals, retention, provider runner and
+  issuer reconciliation, and current Microsoft Graph / Cloudflare Email
+  Service / IONOS SMTP research. No provider was selected or configured.
+
+**PARTIAL / NOT STARTED / RESIDUAL RISK**
+
+- `CF-Connecting-IP` is a throttling key only; Cloudflare must overwrite it and
+  direct-origin access must be blocked. Local tests cannot prove edge provenance.
+- Real Turnstile, provider delivery/unknown reconciliation, Outlook/Graph
+  send-as permission, Cloudflare Email Service onboarding, IONOS mailbox and
+  SPF/DKIM/DMARC alignment, physical power loss, and every hosted issuer ACL
+  boundary remain unverified. No production readiness is claimed.
+- D1 contains moderation PII until the private redaction operator is run; Paul
+  must approve retention, backups, access controls and deletion evidence.
+- Public page remains additive and disabled by committed flags. No public admin
+  route exists. Registration/accounts remain OFF in committed Wrangler configs.
+
+**CHECKS ACTUALLY RUN**
+
+| Check | Result |
+| --- | --- |
+| focused `npm test -- --run backend/invitation-requests.test.ts` | **13 passed, 0 failed** |
+| `npm test` | **90 passed, 0 failed; 9/9 files** |
+| `npm run test:client` | **51 passed, 0 failed, 0 skipped/cancelled** |
+| `npm run check` | PASS: Wrangler types + TypeScript |
+| `npm run build:api` | PASS: dry-run only; 80.04 KiB / 21.13 KiB gzip |
+| `npx wrangler deploy --config .\\wrangler.staging.jsonc --dry-run --outdir .worker-build-staging` | PASS: `between-g5-staging`, confirmed Pages origin, account/request flags false |
+| `git diff --check` | PASS |
+
+Known warning: Wrangler attempted to write its sandbox diagnostic log and
+printed EPERM under the roaming `.wrangler/logs` directory; command exit codes
+and test/build results above were successful. No log or Cloudflare setting was
+changed.
+
+Commit/push this handoff with the implementation and stop for Sara/Paul review.
