@@ -1210,3 +1210,65 @@ Paul says **let's go** toward the first real acknowledgement email. Continue on 
 **Task:** Recommend the lowest-complexity reliable way to deliver immediate ACK and Paul-review notifications from the existing mailbox, with the future invitation mail sent only after Paul's approval. Implement a local provider adapter plus mock/fault tests for the recommended architecture if feasible, integrating the existing durable outbox and UNKNOWN reconciliation. Preserve email privacy, avoid duplicates and no token in URLs. Ensure visitor sees an immediate on-screen receipt even if email provider is temporarily down; queued email must be picked up promptly by a separately authorised runner, not by Sara's scheduled inbox check. Provide exact operational steps and a narrowly scoped first live test plan (one approved sender, one Paul-approved recipient, no invitation token, no registration opening), including all secrets and remote actions requiring separate Paul approval.
 
 **Acceptance:** run focused tests, full backend/client tests, typecheck, builds/dry-runs, verify Minotaur and existing flags remain unchanged; commit only safe files and report exact checks and blockers. If IONOS direct SMTP is unsuitable for Cloudflare Workers, explain precisely why and compare minimal alternatives; don't improvise a production relay. STOP for Sara and Paul's review before any live operation.
+### CODiE to Sara — IONOS integration preparation (2026-10-20)
+
+**READY FOR SARA/PAUL REVIEW — LOCAL ONLY.** Started from `6a38819`. No SMTP
+connection, credential, secret, email send, DNS/IONOS setting, Cloudflare
+mutation, deployment, migration or flag change occurred.
+
+**Recommendation**
+
+Use the new `ionosRelayProvider` HTTPS adapter and a separately hosted,
+Paul-controlled relay for the first acknowledgement. The Worker keeps the
+durable outbox and sends a fixed ACK/review template to the relay with an
+idempotency key; only the relay holds the IONOS mailbox password and speaks
+SMTP. Do not put IONOS credentials in the Worker or attempt direct SMTP from
+the Worker for this first test. Cloudflare documents outbound TCP sockets, but
+port 25 is blocked and a direct 465/587 SMTP/TLS/SASL implementation would add
+substantial protocol, timeout and uncertainty risk without improving the
+outbox guarantee.
+
+The adapter accepts only an HTTPS relay URL, pins the sender to
+`invitations@digiwongadude.com`, uses fixed templates, sends `Idempotency-Key`,
+rejects redirects, and maps definitive 4xx to `FAILED`. Timeout, 429/5xx,
+network failure or a success response without a provider message ID becomes
+`UNKNOWN`; the runner must reconcile before retrying. Invitation tokens are
+only included in the approved in-memory delivery request and never in URLs,
+D1, logs or receipts. The visitor's on-screen receipt remains independent of
+mail delivery.
+
+**IONOS facts and decisions still required**
+
+- Paul must confirm the account's actual regional SMTP host: Sara's setup notes
+  say `smtp.ionos.co.uk`, while current IONOS help pages commonly document
+  `smtp.ionos.com`. Use the full mailbox address as username and TLS/STARTTLS
+  587 or implicit TLS 465; never use port 25.
+- The authenticated mailbox and `From` must both be in the approved
+  `digiwongadude.com` domain. Forward-only `agent@` is not a sending identity.
+- The relay must enforce a small queue rate, no request-body logging, strict
+  destination/template allowlists, secret rotation, and explicit idempotency
+  reconciliation. IONOS's documented hourly limits make a bounded queue
+  appropriate; no bulk sender is being designed.
+- Paul must choose relay hosting, provide one relay secret and one disposable
+  Paul-controlled recipient, verify SPF/DKIM/DMARC without changing DNS, and
+  separately approve Worker secret/configuration, deployment and the one real
+  ACK smoke. No such action was taken.
+
+**Checks actually run**
+
+| Check | Result |
+| --- | --- |
+| focused invitation suite | **15 passed, 0 failed** |
+| `npm test` | **92 passed, 0 failed; 9/9 files** |
+| `npm run test:client` | **51 passed, 0 failed, 0 skipped/cancelled** |
+| `npm run check` | PASS: Wrangler types + TypeScript |
+| `npm run build:api` | PASS: dry-run only; 80.04 KiB / 21.13 KiB gzip |
+| staging Wrangler dry-run | PASS: `between-g5-staging`, Pages origin present, all account/registration/request flags false |
+| `git diff --check` | PASS |
+
+The known sandbox Wrangler EPERM diagnostic-log warning appeared again; all
+commands exited successfully and no log or Cloudflare setting was changed.
+
+**Remaining blocker:** Paul must approve the relay/provider, sender identity,
+IONOS hostname, secret placement and one disposable recipient before any live
+authentication or acknowledgement send. Stop here for review.

@@ -104,6 +104,62 @@ privilege, provide a disposable test recipient, and approve retention and
 DNS/SPF/DKIM/DMARC checks. No provider is selected or configured by this
 commit.
 
+### IONOS first-mail recommendation
+
+The lowest-complexity safe route for the existing mailbox is **not direct SMTP
+from the Worker**. Cloudflare Workers now expose outbound TCP sockets, but port
+25 is blocked and a direct 465/587 implementation would require a carefully
+reviewed SMTP/TLS/SASL client, connection timeouts, provider response handling
+and mailbox credentials inside a Worker. That is more failure-prone than the
+existing outbox boundary and a Worker must never contain the IONOS mailbox
+password.
+
+This branch therefore adds `ionosRelayProvider` as a local-only HTTPS adapter.
+It posts fixed templates to a Paul-approved, separately hosted relay with an
+`Idempotency-Key`; the relay alone holds the IONOS password and speaks SMTP.
+The adapter accepts only an HTTPS endpoint, pins the sender to
+`invitations@digiwongadude.com`, sends no arbitrary user-supplied template, and
+maps a definitive 4xx rejection to `FAILED`. Timeout, 429/5xx, redirect,
+network failure or a successful response without a provider message ID becomes
+`UNKNOWN`; the durable runner must reconcile that state and must not resend
+blindly. Invitation tokens are included only in the in-memory approved
+invitation request body, never in the URL, D1, logs or adapter receipt.
+
+The relay's IONOS configuration is a separate human-controlled step. Paul must
+confirm the account's regional SMTP hostname (the current IONOS help pages show
+`smtp.ionos.com`; Sara's setup notes mention `smtp.ionos.co.uk`), use the full
+`invitations@digiwongadude.com` mailbox as username, and choose TLS/STARTTLS
+587 or implicit TLS 465. IONOS rejects a sender from a different domain and
+publishes hourly sending limits, so the relay must enforce a small queue rate,
+retry only definitive failures, and preserve the existing forwarding/DNS.
+
+#### Narrow first acknowledgement test (requires Paul's separate approval)
+
+1. Paul selects a relay host and verifies its HTTPS certificate, fixed
+   destination, no-body-logging policy, rate limit and secret storage. The
+   IONOS mailbox password stays only in that relay's secret store.
+2. Paul verifies the actual IONOS SMTP hostname/port and sender identity in
+   Outlook/Webmail, and checks current SPF, DKIM and DMARC alignment without
+   changing DNS.
+3. Paul supplies one relay authentication secret and one Paul-controlled,
+   disposable recipient address. CODiE/Sara add the Worker secret and deploy
+   only after explicit approval; neither is done by this commit.
+4. Keep accounts, registration and invitation-request flags closed until the
+   preflight is reviewed. Submit exactly one Turnstile-verified request using
+   the disposable recipient. The page must show its immediate on-screen
+   receipt regardless of mail state.
+5. An authorised runner claims only the ACK row, posts the fixed message once,
+   and records `SENT` plus the relay message ID. Paul verifies exactly one
+   received acknowledgement; it contains no invitation token and says the
+   request is pending personal review, not an account or subscription.
+6. If the relay times out or returns an ambiguous response, stop and reconcile
+   the relay/D1 idempotency key before any retry. Do not test invitation mail or
+   registration in this first smoke.
+
+Required remote actions are therefore explicit: relay hosting/secret setup,
+IONOS credential entry, Worker secret/configuration, D1/Worker deployment and
+one real send. None occurred here.
+
 ### Focused security review (local evidence)
 
 - **Enumeration:** fixed by the Worker-secret HMAC dedupe key and regression

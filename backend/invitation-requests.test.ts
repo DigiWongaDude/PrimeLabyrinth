@@ -7,7 +7,7 @@ import {
   expireInvitationRequests, redactClosedInvitationRequests, recordInvitationIssued, recordInvitationIssuanceUnknown, recordOutboxResult,
   rejectInvitationRequest
 } from './invitation-requests';
-import { deliverOutbox, fakeMailProvider } from './invitation-mail';
+import { deliverOutbox, fakeMailProvider, ionosRelayProvider } from './invitation-mail';
 import { invitationDigest } from './invitations';
 import { randomToken } from './accounts';
 
@@ -139,6 +139,35 @@ test('fake provider runner delivers ACKs and invitations without persisting the 
   expect(provider.calls).toHaveLength(2);
   expect(provider.calls[1].tokenLength).toBe(64);
   expect(JSON.stringify(await env.DB.prepare('SELECT * FROM invitation_request_outbox WHERE request_id=?').bind(row!.id).all())).not.toContain(raw);
+});
+
+test('IONOS HTTPS relay adapter is fixed-template, idempotent and never sends SMTP from the Worker', async () => {
+  const calls: Array<{url:string;init:RequestInit}> = [];
+  const provider = ionosRelayProvider({endpoint:'https://relay.example.test/ionos/send',relaySecret:'relay-fixture-secret-32-bytes',fetcher:async (url,init) => {
+    calls.push({url:String(url),init});
+    return Response.json({messageId:'ionos-fixture-1'},{status:202});
+  }});
+  const result = await provider.send({requestId:'11111111-1111-4111-8111-111111111111',kind:'ACK',templateKey:'invitation_request_received_v1',recipient:'traveller@example.test',idempotencyKey:'a'.repeat(64),attempts:1});
+  expect(result).toEqual({outcome:'sent',providerMessageId:'ionos-fixture-1'});
+  expect(calls).toHaveLength(1);
+  expect(calls[0].url).toBe('https://relay.example.test/ionos/send');
+  expect(calls[0].init.redirect).toBe('error');
+  expect((calls[0].init.headers as Record<string,string>)['Idempotency-Key']).toBe('a'.repeat(64));
+  const payload = JSON.parse(String(calls[0].init.body));
+  expect(payload.from).toBe('invitations@digiwongadude.com');
+  expect(payload.text).not.toContain('traveller@example.test');
+  expect(calls[0].url).not.toContain('traveller@example.test');
+});
+
+test('IONOS relay treats rejection, timeout and missing receipts conservatively', async () => {
+  const message = {requestId:'22222222-2222-4222-8222-222222222222',kind:'ACK' as const,templateKey:'invitation_request_received_v1',recipient:'traveller@example.test',idempotencyKey:'b'.repeat(64),attempts:1};
+  const rejected = ionosRelayProvider({endpoint:'https://relay.example.test/send',relaySecret:'relay-fixture-secret-32-bytes',fetcher:async()=>new Response('no',{status:400})});
+  expect(await rejected.send(message)).toEqual({outcome:'failed',errorCode:'ionos_relay_rejected'});
+  const unknown = ionosRelayProvider({endpoint:'https://relay.example.test/send',relaySecret:'relay-fixture-secret-32-bytes',fetcher:async()=>new Response('busy',{status:503})});
+  expect(await unknown.send(message)).toEqual({outcome:'unknown',errorCode:'ionos_relay_uncertain'});
+  const noReceipt = ionosRelayProvider({endpoint:'https://relay.example.test/send',relaySecret:'relay-fixture-secret-32-bytes',fetcher:async()=>Response.json({accepted:true},{status:202})});
+  expect(await noReceipt.send(message)).toEqual({outcome:'unknown',errorCode:'ionos_relay_no_receipt'});
+  expect(()=>ionosRelayProvider({endpoint:'http://relay.example.test/send',relaySecret:'relay-fixture-secret-32-bytes'})).toThrow('ionos_relay_https_required');
 });
 
 test('rejection is operator-only and approved issuance/delivery states are durable', async () => {
