@@ -1,10 +1,18 @@
-# Invitation admission — local implementation for review
+# Invitation admission — implementation contract and hosted release gate
 
-Migration `migrations/0004_invitations.sql` and the invitation-aware Worker must
-be reviewed and released together. **Not deployed.** Both committed enablement
-flags remain false. Paul alone applies remote migrations, configures secrets or
-enables registration. Do not deploy an older open-signup Worker against this
-schema or restore registration during rollback.
+**Current status (20 October 2026):** migrations `0001`–`0004` are installed
+in the isolated staging D1 and the invitation-aware Worker is deployed as
+staging version `77599eca-33d6-4b27-8dca-5ee92fdea713`. Both committed
+enablement flags remain false. Hosted operator invitation issuance/delivery and
+Google OAuth configuration are still **NOT YET SOLVED**. Paul alone applies
+remote writes, configures secrets or enables registration. Do not deploy an
+older open-signup Worker against this schema or restore registration during
+rollback.
+
+Earlier “not deployed” wording in this document describes the pre-deployment
+design state and is retained as historical context; the status above supersedes
+it. See `G5-HOSTED-INVITATION-OAUTH-PLAN.md` for the hosted operator and OAuth
+gates.
 
 ## Implemented contract
 

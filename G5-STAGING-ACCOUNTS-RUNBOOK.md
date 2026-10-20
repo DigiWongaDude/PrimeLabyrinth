@@ -4,36 +4,37 @@ This is a manual, review-first runbook for the isolated G5 staging test. It is
 not an instruction to deploy. Paul controls every deployment, remote migration,
 secret upload, Cloudflare setting change and registration enablement.
 
-**Admission gate:** Paul selected invitation-only alpha registration. The
-[invitation implementation](backend/INVITATIONS.md) and the local-only operator
-utility are ready for local code review, not deployment. **Hosted invitation
-issuance and delivery are NOT YET SOLVED.** `tools/invitations-local.mjs` must
-not be pointed at remote D1 or used to handle real hosted invitations. Do not
-enable registration until hosted issuance, secure delivery, migration/Worker
-compatibility and Paul's approval are separately satisfied. Pending migration
-0004 must ship with its reviewed Worker. All account-test steps below are
-conditional on that gate.
+**Current verified state (20 October 2026):** Paul has deployed the reviewed
+invitation-aware Worker version `77599eca-33d6-4b27-8dca-5ee92fdea713` to the
+isolated staging API after migrations 0001–0004 were applied. Both account flags
+remain false, the confirmed Pages origin is
+`https://between-g5-preview.pages.dev`, and the Minotaur/closed-state smoke is
+passing. **Hosted invitation issuance and delivery are NOT YET SOLVED.**
 
-## Proposed isolated origins
+The [invitation implementation](backend/INVITATIONS.md) and
+`tools/invitations-local.mjs` are local/review tooling only. Do not point the
+local helper at remote D1 or issue real hosted invitations. Do not enable
+registration until the separate hosted operator plan, secure delivery, Google
+configuration, acceptance tests and Paul's approval are satisfied. The
+historical candidate-origin and “pending migration 0004” statements below are
+pre-deployment context; use the verified values above for the current staging
+environment. See `G5-HOSTED-INVITATION-OAUTH-PLAN.md` for the next gates.
+
+## Verified isolated origins
 
 | Purpose | Exact value |
 | --- | --- |
-| Frontend preview origin | `https://codex-g5-persistence.between-g5-preview.pages.dev` (**UNCONFIRMED candidate**) |
-| OAuth redirect URI | `https://codex-g5-persistence.between-g5-preview.pages.dev/index.html` (**unconfirmed until Pages project/branch exists**) |
+| Frontend preview origin | `https://between-g5-preview.pages.dev` (**confirmed**) |
+| OAuth redirect URI | `https://between-g5-preview.pages.dev/index.html` (**confirmed callback target**) |
 | Staging API | `https://between-g5-staging-api.digiwongadude.workers.dev` |
 | Frontend source config | `npm run build:pages-preview` generates an isolated `dist/` allowlist with the staging API only |
 
-Cloudflare Pages is the practical frontend route because the repository is a
-static browser bundle and the existing `workers.dev` hostname is already the
-API. No Pages project currently exists in this repository/configuration, so the
-hostname cannot be confirmed before Paul/Sara provision it. The candidate is
-valid only if project `between-g5-preview` deploys branch `codex/g5-persistence`;
-Cloudflare's branch alias would then be the value above. If a different project
-name or branch alias is chosen, replace every candidate value before deployment.
-Do not use the live custom domain or x10 hosting. The source staging config
-allowlists the candidate and the API origin, but no route is created by this
-commit. Browser requests must use the confirmed preview origin exactly; an
-origin with a path, trailing slash, query, or fragment is not an OAuth origin.
+Cloudflare Pages remains the static browser frontend and the existing
+`workers.dev` hostname is the API. Paul has confirmed the Pages origin above;
+the source staging config allowlists it and the API origin. Do not use the live
+custom domain or x10 hosting. Browser requests must use the confirmed preview
+origin exactly; an origin with a path, trailing slash, query, or fragment is not
+an OAuth origin.
 
 ## A. Isolated Pages preview preparation (Paul only)
 

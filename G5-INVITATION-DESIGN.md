@@ -1,16 +1,21 @@
 # G5 invitation-only alpha: security design for Sara review
 
-Status: design direction approved by Sara; migration 0004, API enforcement and
-manual frontend invitation input are now **locally implemented for review**.
-21 schema and 14 invitation-route tests exist; the route tests use locally signed
-OIDC tokens, not live Google. Operator tooling and hosted validation are pending.
-See [implementation contract](backend/INVITATIONS.md) for the transaction/proof
-mechanism and release gates. Nothing is deployed. Original source reviewed:
+**Current status (20 October 2026):** design direction is approved; migration
+0004, API enforcement and manual frontend invitation input are implemented and
+the reviewed Worker is deployed to isolated staging as version
+`77599eca-33d6-4b27-8dca-5ee92fdea713`. The staging database has migrations
+0001–0004. Both account flags remain false. Hosted operator issuance/delivery,
+real Google configuration and hosted acceptance are still pending. See
+`G5-HOSTED-INVITATION-OAUTH-PLAN.md` for the bounded next plan.
+
+21 schema and 14 invitation-route tests exist; route tests use locally signed
+OIDC tokens, not a live Google tenant. See [implementation contract](backend/INVITATIONS.md)
+for the transaction/proof mechanism and release gates. Original source reviewed:
 `f40c66359f14ef8a516c92a820dfb5db4a0d9c49`, `codex/g5-persistence`.
 Paul approved invitation-only registration in the shared notes. This replaces
 the earlier recommendation for a short open-registration window. The public
-invitation-request waiting list is out of scope. All deployed settings stay as
-they are; Paul alone authorises deployment and remote migration.
+invitation-request waiting list is out of scope. All other deployed settings
+stay as they are; Paul alone authorises deployment and remote migration.
 
 ## Decision and security boundary
 
