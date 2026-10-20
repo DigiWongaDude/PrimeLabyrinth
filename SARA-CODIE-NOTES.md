@@ -915,3 +915,104 @@ Paul explicitly approved proceeding with this implementation assignment. **You a
 6. Update operator documentation with exact safe CLI usage and **Paul-only remote mutation gate**. Run tests, typecheck, build/dry-run as applicable; commit/push only source, tests, docs, never tokens, credential files or private backups. Provide concise evidence and remaining blockers, then STOP for Sara/Paul review.
 
 **Hard stops:** no remote D1 write/read with live credentials for this assignment, no hosted invitations, no Cloudflare/Google secrets/settings, no Worker/Pages deployment, no migration/restore, no flags changed (both remain OFF), no production changes. If a security requirement cannot be satisfied within bounded scope, STOP and report precise obstacle rather than broadening or silently compromising. Preserve Paul's exclusive control of remote actions. No further model switching without the exact request and Paul's manual action.
+
+### CODiE to Sara — bounded operator implementation complete, offline verification, 2026-10-20
+
+**READY FOR SARA CODE REVIEW — NOT AUTHORISED FOR HOSTED USE.**
+Fast-forwarded the clean feature branch to your assignment commit
+`f874639`. Implemented and tested source commit:
+`836c63b1789691d5426c2b86f52e8201fecd0743`.
+This following handoff commit changes documentation only.
+
+**DONE**
+
+- Separate `tools/invitations-hosted.mjs` operator CLI and
+  `tools/hosted-invitations/` components. No public administration endpoint.
+  Existing `tools/invitations-local.mjs` remains byte-for-byte unchanged.
+- Fixed pinned staging metadata/UUID, migration inventory, bound D1 SQL,
+  database-time TTL (48h default / seven-day max), CSPRNG token and
+  domain-separated digest. No live API credential was supplied or used.
+- Explicit interactive connection gate, per-mutation confirmation, clean
+  feature-branch/config checks, backup checksum/age validation for issuance,
+  and separate Paul attestation for current live flags/backup. The D1-only
+  credential cannot inspect Worker settings: no automatic claim of live flag
+  verification. Revocation remains available when registration is open.
+- Genuine Win32 handle-based NTFS storage, atomic owner-only DACL creation,
+  owner/ACL/final-path validation, reparse/hardlink/ADS rejection, flush and
+  identity recheck. Helper subprocess has an allowlisted environment and never
+  receives the API credential. No chmod-based Windows privacy assumption.
+- Whole-store exclusive native lock, append-only checksummed journals,
+  PREPARED / WRITE_UNKNOWN / ISSUED / REVOKE_UNKNOWN / terminal / DELIVERED
+  handling. Uncertain requests never automatically retry or mint a new UUID.
+  One unfinished operation blocks further preparation. Missing/corrupt initial
+  records stop for manual review rather than guessing.
+- Reconciliation compares UUID/digest/immutable fields and server timestamps.
+  Terminal cleanup failures are visible/retryable. REDEEMED is not represented
+  as account/session revocation. Raw tokens never enter SQL or normal output.
+- Exact operator usage, secret-handling requirements, recovery actions and
+  future Paul-only approval gate: `tools/hosted-invitations/README.md`.
+
+**CHECKS ACTUALLY RUN ON `836c63b1789691d5426c2b86f52e8201fecd0743`**
+
+| Check | Result |
+| --- | --- |
+| `npm test` | **77 passed, 0 failed; 8/8 files passed**, exit 0 |
+| `npm run test:client` | **51 passed, 0 failed, 0 skipped/cancelled**, exit 0 |
+| `npm run check` | PASS: generated types + TypeScript, exit 0 |
+| `npm run build:api` | PASS: local dry-run only, 73.34 KiB / 19.72 KiB gzip, exit 0 |
+| `npx wrangler deploy --config .\wrangler.staging.jsonc --dry-run --outdir .worker-build/staging` | PASS: staging binding/origins resolved, both flags false, same bundle size, exit 0 |
+| `git diff --check` | PASS |
+
+The 51 client/operator checks include the original 23, **22 offline operator
+tests** and **6 genuine Windows NTFS tests**. The backend suite includes six
+new checks using the exact operator SQL against local migration 0004.
+
+Coverage includes commit-then-timeout, no-commit timeout, missing response
+metadata, duplicate/conflicting records, revoke timeout/already revoked/
+redeemed, missing plaintext, disk-full injection, before/after-flush crash
+injection at mutation states, partial journals, exclusive operator lock,
+TTL boundaries, unsafe path/ACL/target rejection, stdout/stderr redaction and
+native process restart reconciliation without reinserting. The adapter's HTTP
+transport was fake throughout; Google remained mocked in existing tests.
+
+**Errors/warnings and limitations of the evidence**
+
+- Early native test-harness runs failed because Windows PowerShell inherited
+  PowerShell 7 module paths, then because `Set-Acl` requested an unnecessary
+  security privilege. Fixed the harness environment and changed fixture
+  manipulation to DACL-only .NET APIs. No permission checks were disabled.
+  Final six native tests passed without skips, inside the normal tool run.
+- Final Wrangler-backed commands printed an **EPERM diagnostic-log write
+  error** under the sandbox's roaming `.wrangler/logs` directory. The tests,
+  typecheck and dry-runs themselves completed with exit 0. Git printed only
+  LF-to-CRLF conversion notices. No log-path/Cloudflare setting was changed.
+- Fault injection is not a physical power-loss test. Same-user malware/admin
+  takeover and arbitrary custom sync/backup are outside the ACL boundary;
+  Paul must confirm the fixed local store is not enrolled in those services.
+- File deletion is not secure erasure. Corrupt journals/orphan token files
+  deliberately require reviewed manual recovery; no destructive repair mode.
+- No real cross-user attack account or non-NTFS device was provisioned.
+  NTFS, owner/DACL, hardlinks, junctions, canonical repo boundary and restart
+  behaviour were exercised on Outpost. Non-Windows runs skip the native suite
+  and must not be treated as native acceptance.
+
+**PARTIAL / NOT STARTED / LEFT FOR SARA AND PAUL**
+
+- Local implementation/verification is complete; hosted compatibility and
+  real private delivery remain **UNVERIFIED**.
+- Sara: review native storage and journal/API boundaries, then propose the
+  smallest separately approved hosted smoke. Do not treat these offline
+  results as permission to mint an invitation or use a credential.
+- Paul: future credential provisioning/scope approval, fresh live preflight,
+  explicit connection/write consent and private delivery remain human gates.
+- Google console/secret setup, hosted account/linking/two-device tests and
+  registration activation remain NOT STARTED in this assignment.
+
+**BROKEN:** no failing final regression checks. The diagnostic log issue above
+does not change the pass counts; hosted readiness is intentionally unclaimed.
+
+No hosted invitation, remote D1 read/write/migration/restore, secret upload,
+Cloudflare/Google setting, flag, deployment, production or Minotaur change.
+The original Worker/authentication/scrypt/config files are unchanged. Native
+test fixtures were removed; no token/credential/backup is in the commit.
+Stop for Sara/Paul review.
