@@ -1354,3 +1354,65 @@ Paul authorises the next **local-only planning, implementation and testing miles
 **Checks:** Run available tests, typecheck, builds/dry-run, git diff --check; report results, changed files, specific risks/blockers and staged rollout order in `SARA-CODIE-NOTES.md`. Commit/push safe docs/code to `codex/g5-persistence`, then STOP.
 
 **Hard stops:** No remote Cloudflare reads/writes or migrations; no domain/registrar/DNS/NS/DNSSEC/IONOS/X10 changes; no Email Service onboarding, secrets, sending, live provider auth, Pages/Worker deploy, account flags, production merge, live invitation or real email. Paul alone expressly authorises each live operation. Remain on 5.6 Luna High; request any model switch with a concrete reason and wait for Paul.
+
+### CODiE to Sara — Platform Blueprint v1 preparation (2026-10-20)
+
+**READY FOR SARA REVIEW — LOCAL ONLY.** Started from reviewed commit
+`6aae6536f2a1c46c192e9635660c7e55e32358e7`. The implementation and handoff
+changes are committed and pushed in the follow-up commit reported below. No
+Cloudflare, DNS, registrar, X10, IONOS, Email Service, secret, deployment,
+migration, flag, or live-email operation was performed.
+
+**DONE**
+
+- Added reusable public-only `client-config.js` with validated tenant/domain/
+  origin/branding/mail/binding/flag inputs, deep immutability, and no secret
+  serialization.
+- Kept existing `G5_API_URL` compatibility while making project defaults
+  explicit and disabled when no API origin is configured.
+- Updated the Pages preview builder to generate an isolated staging client
+  module for `between-g5`, including the confirmed Pages origin and staging API
+  origin; existing preview allowlist remains unchanged.
+- Added `tests/client-config.test.mjs` covering tenant isolation, validation,
+  immutability, public-only generated output and disabled flags.
+- Added `PLATFORM-BLUEPRINT-V1.md`, `DNS-MIGRATION-RUNBOOK.md`,
+  `CLIENT-DEPLOYMENT-CHECKLIST.md`, and `PAUL-ACTION-CHECKLIST.md`.
+- Documented the X10 website/IONOS mailbox preservation boundary, Cloudflare
+  staging architecture, DNS record inventory and rollback gates, per-client
+  parameterisation, least privilege, backups, budgets, and the exact evidence
+  and approvals Paul must provide before any live migration or onboarding.
+
+**CHECKS ACTUALLY RUN**
+
+| Check | Result |
+| --- | --- |
+| `npm run test:client` | **54 passed, 0 failed, 0 skipped/cancelled** |
+| `npm test` | **94 passed, 0 failed; 9/9 files** |
+| `npm run check` | PASS: Wrangler types + TypeScript |
+| `npm run build:api` | PASS: local dry-run only; 80.04 KiB / 21.13 KiB gzip |
+| `npx wrangler deploy --config .\\wrangler.staging.jsonc --dry-run --outdir .worker-build-staging` | PASS: `between-g5-staging`; Pages origin present; `EMAIL_ACK`/`EMAIL_REVIEW` bindings rendered; account, registration and invitation-request flags remain `false` |
+| `git diff --check` | PASS |
+
+The generated `.worker-build-staging` directory was removed after the dry-run.
+The known sandbox Wrangler EPERM diagnostic-log warning appeared during local
+Vitest/Wrangler runs; command exit codes remained zero and no setting changed.
+
+**PARTIAL / BLOCKED**
+
+- Authoritative DNS provider, registrar, nameservers, DNSSEC/DS, live records,
+  X10 origin, IONOS forwarding, Cloudflare zone ownership, and Email Service
+  onboarding remain unverified by design. Sara's connected Cloudflare account
+  previously exposed zero zones.
+- No DNS cutover or Cloudflare Email Service onboarding can be planned as
+  executable until Paul supplies the read-only evidence in
+  `PAUL-ACTION-CHECKLIST.md` and separately approves each action.
+- The reusable client contract is intentionally public-only; secrets and live
+  bindings remain operator-managed and are not included in the generated Pages
+  bundle.
+
+**NEXT OWNER**
+
+Sara can review the architecture/tests and use Paul's checklist to collect
+evidence. Paul controls any registrar, DNS, X10, IONOS, Cloudflare, Email
+Service, deployment, migration, secret, or flag action. No live change is
+recommended from this handoff.
