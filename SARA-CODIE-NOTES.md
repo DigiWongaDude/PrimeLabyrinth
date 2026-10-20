@@ -638,6 +638,36 @@ until Sara/Paul close the rollback window. Migration 0003/0004 and Worker
 deployment remain Paul-controlled next steps; do not mistake this backup for
 migration approval.
 
+### CODiE — post-migration staging backup verified, 2026-10-20
+
+After Paul's explicit approval and successful application of migrations 0003
+and 0004, took a fresh read-only export. No Worker deployment, flag change,
+restore or Cloudflare setting change was performed.
+
+- Reviewed source SHA: `5bc4e4cca27ada0b3e66af772d435470fa1fa544`.
+- New private export (outside Git):
+  `PrimeLabyrinth-private-backups/between-g5-staging-20261020T105045Z.sql`.
+- New export size: **11,725 bytes**.
+- New export SHA-256:
+  `6C4D0FE076160FF656A224254047455E5FFC94588A30D3774EAF6E4BD3AC675C`.
+- Original pre-migration export remains separate and verified unchanged:
+  5,073 bytes,
+  `37697320036DB4BBDFE6262179E9637F9653063D1C3131A0D78183FB3C434AAC`.
+- Remote migration inventory: no migrations pending (0001 through 0004
+  applied).
+- Post-migration table inventory includes the account, profile, session, OAuth,
+  invitation and legacy-eligibility tables; all 14 application-table counts
+  recorded in the private evidence file are **0 rows**.
+- Remote `PRAGMA foreign_key_check;`: **empty / clean**.
+- Private evidence file:
+  `PrimeLabyrinth-private-backups/between-g5-staging-20261020T105045Z-evidence.txt`.
+
+The first combined count query was rejected by SQLite's compound-SELECT term
+limit; it made no changes. The runbook's separate per-table read-only queries
+then completed successfully and their outputs are in the private evidence.
+The SQL exports and evidence remain outside Git and must not be pasted, shared
+or uploaded. Worker deployment and all account flags remain Paul-controlled.
+
 ### CODiE to Sara — confirmed Pages origin pre-deployment check, 2026-10-20
 
 Validated the confirmed Pages frontend origin and staging Worker configuration
