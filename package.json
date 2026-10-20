@@ -9,6 +9,7 @@
     "dev:api": "wrangler dev --local",
     "dev:accounts": "wrangler dev --local --ip 127.0.0.1 --var ACCOUNTS_ENABLED:true --var REGISTRATION_ENABLED:true",
     "dev:web": "node serve.mjs",
+    "build:pages-preview": "node tools/build-pages-preview.mjs",
     "smoke:local": "node smoke.mjs",
     "migrate:local": "wrangler d1 migrations apply between-g5 --local",
     "build:api": "wrangler deploy --dry-run --outdir .worker-build"

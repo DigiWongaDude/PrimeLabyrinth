@@ -506,3 +506,60 @@ Paul is at Jen's on his tablet; CODiE is at Outpost. Paul approved **preparation
 4. Run only relevant local static/config validation, existing tests if changed code warrants, and dry-runs. Commit/push to `codex/g5-persistence` and leave a concise handoff (files, commands/results, remaining human actions). STOP for Sara review.
 
 **ABSOLUTE BOUNDARIES:** Do NOT deploy Pages/Worker, run remote migrations or commands, create/change Cloudflare projects/settings/secrets, enable registration/accounts, configure Google, touch DNS/x10/live site, merge to production, or switch your own model. No unapproved public registration or real invitations. If a substantive security architecture question arises, STOP and ask Paul to switch manually using exact phrase "Switch me over to Astra High"; wait for "Carry on CODiE".
+
+### CODiE to Sara — isolated Pages preview preparation, 2026-10-20
+
+Implemented and pushed only the preparation requested above. No Pages or Worker
+deployment, remote migration/command, Cloudflare project/setting/secret change,
+Google configuration, DNS/x10/live-site change, registration enablement or
+production merge was performed. Both account flags remain false in the checked
+source configs.
+
+**DONE:**
+
+- Added `npm run build:pages-preview` (`tools/build-pages-preview.mjs`). It
+  copies an explicit eight-file browser allowlist into ignored `dist/` and
+  generates `g5-config.js` containing only the known staging API origin
+  `https://between-g5-staging-api.digiwongadude.workers.dev`. It does not copy
+  Worker source, migrations, tests, docs, package files or secrets and does not
+  include an OAuth redirect. Added a focused allowlist test.
+- Reconciled `G5-STAGING-ACCOUNTS-RUNBOOK.md`: beginner-friendly Paul-only
+  Pages checklist, branch/build/output settings, actual-origin verification,
+  static-output security checks, and explicit staged order from confirmed URL
+  through closed deployment and limited invited window.
+- Marked hosted invitation issuance/delivery **NOT YET SOLVED**. The local
+  `tools/invitations-local.mjs` utility remains local-only and must not be
+  pointed at remote D1 or used for real hosted invitations.
+- Updated `g5-config.staging.example.js` to direct operators to the allowlisted
+  build helper rather than manual root-file copying. Added `dist/` to `.gitignore`.
+
+**VALIDATION ACTUALLY RUN:**
+
+- `node --test tests/pages-preview.test.mjs`: **1/1 PASS**, exit 0.
+- `npm run build:pages-preview`: PASS; exactly 8 allowlisted files generated.
+- `npm run test:client`: **23/23 PASS**, exit 0 (the new focused test is included).
+- `npm test`: **71/71 PASS**, 7/7 files, exit 0.
+- `npm run check`: PASS, exit 0.
+- `npm run build:api`: PASS, dry-run only, 73.34 KiB / 19.72 KiB gzip.
+- `npx wrangler deploy --config wrangler.staging.jsonc --dry-run --outdir .worker-build/staging`:
+  PASS, dry-run only, 73.34 KiB / 19.72 KiB gzip; staging D1 resolved and
+  `ACCOUNTS_ENABLED=false`, `REGISTRATION_ENABLED=false`.
+- Static output audit: `dist/` contains only the eight allowlisted files;
+  repository/backend/secret markers were not found in output.
+- `git diff --check`: PASS. Wrangler emitted known local EPERM warnings while
+  attempting to write its user log; commands still exited 0 and produced the
+  expected type/build output.
+
+**PARTIAL / HUMAN ACTIONS:**
+
+- The Pages project and preview URL remain unconfirmed. Paul must create the
+  isolated project manually, deploy the branch, copy the actual HTTPS origin,
+  and only then use that origin for any later OAuth configuration.
+- Paul/Sara still own private remote D1 backup, migration 0004 + closed-flags
+  Worker deployment, hosted invitation issuance/delivery design, Google client
+  setup, invited acceptance testing, and rollback evidence. Do not reuse the
+  candidate hostname as an OAuth redirect until the dashboard confirms it.
+
+**COMMIT:** this handoff and preparation are committed on
+`codex/g5-persistence`; see the final commit SHA in the task report.
+Stop here for Sara review; Paul retains all deployment and remote authority.

@@ -5,12 +5,14 @@ not an instruction to deploy. Paul controls every deployment, remote migration,
 secret upload, Cloudflare setting change and registration enablement.
 
 **Admission gate:** Paul selected invitation-only alpha registration. The
-[invitation implementation](backend/INVITATIONS.md) is ready for local code
-review, not deployment. Operator issuance/delivery tooling and hosted acceptance
-are outstanding. Do not enable registration until those release gates and
-Paul's approval are satisfied. Pending migrations now include 0004.
-All account-test steps below are conditional on that gate being implemented,
-verified and separately approved for deployment.
+[invitation implementation](backend/INVITATIONS.md) and the local-only operator
+utility are ready for local code review, not deployment. **Hosted invitation
+issuance and delivery are NOT YET SOLVED.** `tools/invitations-local.mjs` must
+not be pointed at remote D1 or used to handle real hosted invitations. Do not
+enable registration until hosted issuance, secure delivery, migration/Worker
+compatibility and Paul's approval are separately satisfied. Pending migration
+0004 must ship with its reviewed Worker. All account-test steps below are
+conditional on that gate.
 
 ## Proposed isolated origins
 
@@ -19,7 +21,7 @@ verified and separately approved for deployment.
 | Frontend preview origin | `https://codex-g5-persistence.between-g5-preview.pages.dev` (**UNCONFIRMED candidate**) |
 | OAuth redirect URI | `https://codex-g5-persistence.between-g5-preview.pages.dev/index.html` (**unconfirmed until Pages project/branch exists**) |
 | Staging API | `https://between-g5-staging-api.digiwongadude.workers.dev` |
-| Frontend source config | copy `g5-config.staging.example.js` to `g5-config.js` in the preview build only |
+| Frontend source config | `npm run build:pages-preview` generates an isolated `dist/` allowlist with the staging API only |
 
 Cloudflare Pages is the practical frontend route because the repository is a
 static browser bundle and the existing `workers.dev` hostname is already the
@@ -33,7 +35,72 @@ allowlists the candidate and the API origin, but no route is created by this
 commit. Browser requests must use the confirmed preview origin exactly; an
 origin with a path, trailing slash, query, or fragment is not an OAuth origin.
 
-## A. Preflight and private D1 backup
+## A. Isolated Pages preview preparation (Paul only)
+
+This is a click-by-click preparation checklist. CODiE has not created a Pages
+project, deployed a preview, changed Cloudflare settings or configured OAuth.
+The candidate hostname above is **not real until the dashboard confirms it**.
+
+1. Build the preview from a clean checkout of `codex/g5-persistence`:
+
+   ```text
+   npm run build:pages-preview
+   ```
+
+   The command writes only the ignored `dist/` directory. Its eight files are
+   `index.html`, `style.css`, `app.js`, `engine.js`, `view.js`,
+   `journey-client.js`, `account-client.js` and generated `g5-config.js`.
+   Never point Pages at the repository root: that would expose Worker source,
+   migrations, tests and operational notes.
+
+2. In Cloudflare Dashboard open **Workers & Pages → Create application →
+   Pages → Connect to Git → GitHub**, then select
+   `DigiWongaDude/PrimeLabyrinth`. Create a separate project named
+   `between-g5-preview` only if that name is available. Do not select the live
+   GitHub Pages project, `DigiWongaDude.com`, x10 hosting or a custom domain.
+
+3. Use these project settings: framework preset **None**, production branch
+   `codex/g5-persistence`, build command `npm run build:pages-preview`, output
+   directory `dist`, and repository root `/`. Add no environment variables,
+   secrets or OAuth values. Keep the Worker variables and both account flags
+   unchanged (`ACCOUNTS_ENABLED=false`, `REGISTRATION_ENABLED=false`).
+
+4. Paul may save/deploy the Pages preview for the private sea trial. Record
+   the exact HTTPS origin copied from the Pages dashboard after deployment;
+   do not infer it from the candidate. If Cloudflare offers Access controls,
+   use the approved test-user policy, but remember that the Worker admission
+   gate—not Pages visibility—is authoritative.
+
+5. Verify the actual origin before any Google configuration: open the copied
+   URL, confirm the bundle loads, and inspect the page source/network requests.
+   Confirm `g5-config.js` contains only the known staging API origin and that
+   `/backend`, `/migrations`, `/tests`, `.env*`, package files, credentials and
+   handoff notes are not served. If the origin differs from the candidate,
+   update the Worker origin allowlist through Paul's reviewed deployment plan;
+   do not add a guessed URL to Google.
+
+6. Only after the exact origin and security review are recorded may Paul
+   continue to the staged order below. This preview preparation has no effect
+   on G1–G4 GitHub Pages, DigiWongaDude.com, x10, DNS or production.
+
+**Required staged order after the preview URL is confirmed:**
+
+1. Confirm the Pages URL and review the static output/security boundary.
+2. Make a private staging D1 backup and record checksum, migrations and rows.
+3. Paul applies migration 0004 remotely and deploys the Worker with both flags
+   closed; CODiE does not run those commands.
+4. Run closed-state smoke, origin, ledger and Minotaur preservation checks.
+5. Configure Google client values/secrets only against the confirmed preview
+   redirect URI.
+6. Solve and review secure **hosted invitation issuance/delivery** (currently
+   NOT YET SOLVED); do not reuse the local utility for remote D1.
+7. Open a tiny, Paul-approved invited-account acceptance window, then close it
+   again and record evidence.
+
+The order is deliberate: no real invitation or OAuth client is needed merely
+to create the static preview.
+
+## B. Preflight and private D1 backup
 
 1. Confirm the reviewed branch and clean tree:
 
@@ -61,7 +128,7 @@ origin with a path, trailing slash, query, or fragment is not an OAuth origin.
    than querying them. Keep the backup until the
    invited test and rollback window are closed.
 
-## B. Google Cloud configuration (Paul/Sara, no secrets in Git)
+## C. Google Cloud configuration (Paul/Sara, no secrets in Git)
 
 1. In the approved Google Cloud project create/select a **Web application** OAuth
    client. Restrict the consent-screen audience to named test users while this
@@ -69,27 +136,27 @@ origin with a path, trailing slash, query, or fragment is not an OAuth origin.
 2. Add this exact authorised redirect URI, byte-for-byte:
 
    ```text
-   https://codex-g5-persistence.between-g5-preview.pages.dev/index.html
+   https://<confirmed-pages-origin>/index.html
    ```
 
-   Add the exact JavaScript origin
-   `https://codex-g5-persistence.between-g5-preview.pages.dev` where Google
-   requests it, only after confirming the Pages project and branch alias. Do not
-   add the API origin or the Minotaur root.
+   Add the exact JavaScript origin `https://<confirmed-pages-origin>` where
+   Google requests it, only after confirming the Pages project and branch alias.
+   Substitute the dashboard's real hostname; do not enter the unconfirmed
+   candidate, API origin or Minotaur root.
 3. Put the public client ID and redirect URI in the staging Worker vars. Put the
    client secret only into the Cloudflare secret store, never into JSON, GitHub,
    the browser bundle or chat:
 
    ```text
    GOOGLE_CLIENT_ID=<public client id>
-   GOOGLE_REDIRECT_URI=https://codex-g5-persistence.between-g5-preview.pages.dev/index.html
+   GOOGLE_REDIRECT_URI=https://<confirmed-pages-origin>/index.html
    npx wrangler secret put GOOGLE_CLIENT_SECRET --config wrangler.staging.jsonc
    ```
 
 4. Keep `ACCOUNTS_ENABLED=false` and `REGISTRATION_ENABLED=false` for the first
    deployment and smoke pass. Google configuration alone must not open signup.
 
-## C. Initial staging deployment (registration closed)
+## D. Initial staging deployment (registration closed)
 
 Only Paul runs these commands after approval. The initial source deployment is
 performed after the backup and migration preflight; this runbook does not run
@@ -115,7 +182,7 @@ Before the deploy, verify the source dry-run has resolved the staging D1,
   pre-migration snapshot. New profile/eligibility backfills must match their
   migration specification; do not expect every table count to be unchanged.
 
-## D. Invited account test window
+## E. Invited account test window
 
 After the invitation implementation passes review and closed smoke checks,
 Paul may approve deployment and invitation redemption. Record the exact Worker
@@ -172,7 +239,7 @@ enforcement; close it again at the end of testing.
    stable public ID and first-discovery timestamp do not. Anonymise only in a
    disposable test and confirm the ledger remains with `Anonymous traveller`.
 
-## E. Rollback and stop conditions
+## F. Rollback and stop conditions
 
 1. If any smoke, auth, attribution or Minotaur check fails, immediately set
    `REGISTRATION_ENABLED=false` (and `ACCOUNTS_ENABLED=false` if necessary) and
