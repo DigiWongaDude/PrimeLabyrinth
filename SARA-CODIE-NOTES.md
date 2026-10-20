@@ -1286,3 +1286,53 @@ Paul expressly approves proceeding with **local implementation/research only**, 
 5. Provide an exact Paul approval checklist for first one-recipient real ACK smoke: DNS inspection, email sending onboarding, binding configuration, preview/privacy setting, one approved recipient, remote deployment/flags, costs, test and rollback. Every remote action is separately approved by Paul. No real send now.
 
 **Hard stops:** NO remote Cloudflare reads/writes, DNS changes, domain onboarding, secrets, deployment, remote migrations, flag changes, live email, IONOS/Outlook settings, account registration, production merge or token issuance. Commit/push only safe code/docs/tests to `codex/g5-persistence`, append a clear report to this handoff, then STOP. If a provider prerequisite blocks implementation, report precisely. Paul controls model selection; stay Luna High unless he explicitly switches.
+
+### CODiE to Sara — Native Cloudflare Email Service preparation (2026-10-20)
+
+**READY FOR REVIEW — LOCAL ONLY.** Tested implementation commit:
+`668321363729e9210eab6af94322c80dac259024` (pushed to
+`codex/g5-persistence`). No domain inspection, Email Sending onboarding, DNS
+edit, Email Routing change, secret, deployment, migration, flag change or real
+email occurred.
+
+**DONE**
+
+- Added typed, mockable `cloudflareEmailProvider` in
+  `backend/invitation-mail.ts`. It implements the existing durable outbox
+  contract, pins `invitations@digiwongadude.com`, emits fixed templates and
+  keeps invitation tokens in memory only.
+- Preserved conservative outcomes: definitive sender/recipient/payload
+  restrictions become `FAILED`; rate limits, delivery/service exceptions,
+  ambiguous exceptions and missing message IDs become `UNKNOWN`; no blind
+  retry or replacement token is introduced. A Cloudflare `messageId` is
+  documented as acceptance/unique-ID evidence, not recipient delivery.
+- Added fake-binding coverage for accepted sends, suppressed and unverified
+  senders, rate limits, missing receipts, ambiguous exceptions, invitation
+  token secrecy, missing tokens and duplicate outbox delivery claims.
+- Prepared `EMAIL_ACK` (fixed sender allowlist) and `EMAIL_REVIEW` (fixed
+  sender plus `invitations@digiwongadude.com` destination) in
+  `wrangler.staging.jsonc`; these are not contacted locally or remotely.
+- Added DNS, IONOS/Cloudflare interaction, Email preview privacy, suppression,
+  Activity-log reconciliation and Paul’s per-action first-ACK approval
+  checklist to `INVITATION-REQUESTS.md`.
+
+**CHECKS ACTUALLY RUN**
+
+| Check | Result |
+| --- | --- |
+| focused `npm test -- --run backend/invitation-requests.test.ts` | **17 passed, 0 failed** |
+| `npm test` | **94 passed, 0 failed; 9/9 files** |
+| `npm run test:client` | **51 passed, 0 failed, 0 skipped/cancelled** |
+| `npm run check` | PASS: Wrangler types + TypeScript |
+| `npm run build:api` | PASS: local dry-run, 80.04 KiB / 21.13 KiB gzip |
+| `npx wrangler deploy --config .\\wrangler.staging.jsonc --dry-run --outdir .worker-build-staging` | PASS: `between-g5-staging`; `EMAIL_ACK`/`EMAIL_REVIEW` bindings rendered; Pages origin present; account, registration and invitation-request flags remain `false` |
+| `git diff --check` | PASS |
+
+The known sandbox Wrangler EPERM diagnostic-log warning appeared during local
+Vitest/Wrangler runs; command exit codes remained zero. The Cloudflare zone,
+current MX/SPF/DKIM/DMARC records, Email Sending onboarding state, preview
+setting, suppressions, limits and final cost remain **NOT VERIFIED** because
+Sara’s hard stop forbids remote reads. Native Email Service is therefore
+**CONDITIONALLY BLOCKED** until Paul captures the read-only DNS evidence and
+approves the exact onboarding/binding/privacy steps. The IONOS HTTPS relay
+remains an unconfigured fallback.
