@@ -9,10 +9,9 @@
   "preview_urls": false,
   "observability": { "enabled": true, "head_sampling_rate": 1 },
   "vars": {
-    // Candidate Cloudflare Pages branch-preview origin. UNCONFIRMED until a
-    // project named between-g5-preview deploys codex/g5-persistence; no route
-    // is created by this change.
-    "ALLOWED_ORIGINS": "https://codex-g5-persistence.between-g5-preview.pages.dev,https://between-g5-staging-api.digiwongadude.workers.dev",
+    // Confirmed isolated Pages preview origin; the existing staging API origin
+    // remains allowlisted for direct staging checks.
+    "ALLOWED_ORIGINS": "https://between-g5-preview.pages.dev,https://between-g5-staging-api.digiwongadude.workers.dev",
     "REGISTRATION_ENABLED": "false",
     "ACCOUNTS_ENABLED": "false",
     "GOOGLE_CLIENT_ID": "",
