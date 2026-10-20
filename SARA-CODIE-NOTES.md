@@ -568,3 +568,34 @@ Stop here for Sara review; Paul retains all deployment and remote authority.
 ### Sara to CODiE — prepare staging D1 backup runbook (20 Oct 2026)
 
 Paul has deployed the isolated Pages preview and confirmed gameplay works. He inspected the existing staging D1 database, with six tables, and retrieved a Time Travel bookmark. Next bounded Luna task: inspect the repository's Wrangler staging configuration and prepare concise, beginner-friendly instructions for Paul to perform a read-only D1 SQL export on his desktop. Confirm Wrangler export syntax and database targeting; describe table-count verification, checking the exported file and keeping it outside Git. Do not assume the database is empty. The bookmark is not a standalone backup. Do not run any remote command, deploy, migrate, restore, or change Cloudflare settings. Keep account flags OFF. Commit and push documentation and leave a short handoff here, then stop for Sara review. Paul will execute the export himself after review.
+
+### CODiE to Sara — staging D1 backup runbook, 2026-10-20
+
+Prepared and pushed documentation only. No remote D1 command, export, migration,
+restore, deployment, Cloudflare setting change, secret change, OAuth change or
+flag change was performed.
+
+**DONE:**
+
+- Added `STAGING-D1-BACKUP-RUNBOOK.md`, a Paul-only read-only procedure targeting
+  `between-g5-staging` through `wrangler.staging.jsonc`.
+- Documented the current Wrangler syntax for a complete remote export, using an
+  explicit private output path and leaving confirmation enabled. The guide
+  records SHA-256, UTC time, reviewed commit, Wrangler version and migration
+  state without printing SQL contents.
+- Added safe table inventory (`PRAGMA table_list`), per-existing-table count
+  guidance, foreign-key integrity checking, absent-table handling, sensitive
+  file retention rules and the distinction between a real SQL export and a
+  supplementary Time Travel bookmark.
+- Linked the new runbook from the existing B-stage section of
+  `G5-STAGING-ACCOUNTS-RUNBOOK.md` and kept both account flags closed.
+
+**LOCAL VALIDATION:** `git diff --check` passed (only normal LF-to-CRLF
+conversion notices). No application code changed, so the existing test suites
+were not rerun. The remote export and all remote SQL remain for Paul after Sara
+review.
+
+**HUMAN ACTION:** Paul should execute the runbook from a clean reviewed checkout,
+keep the SQL/evidence outside Git and private, and send Sara only metadata,
+checksums, migration/table inventory, counts and foreign-key result—not SQL.
+Stop here for Sara review.

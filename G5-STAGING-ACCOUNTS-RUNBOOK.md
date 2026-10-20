@@ -102,31 +102,23 @@ to create the static preview.
 
 ## B. Preflight and private D1 backup
 
-1. Confirm the reviewed branch and clean tree:
+Follow [`STAGING-D1-BACKUP-RUNBOOK.md`](STAGING-D1-BACKUP-RUNBOOK.md) exactly.
+It is the Paul-only, read-only procedure for the staging export and evidence
+inventory. In summary, Paul must:
 
-   ```text
-   git switch codex/g5-persistence
-   git pull --ff-only origin codex/g5-persistence
-   git rev-parse HEAD
-   git status --short
-   ```
+1. Confirm the reviewed branch and clean tree, and keep the existing G1–G4
+   GitHub Pages site and DigiWongaDude.com unchanged.
+2. Export `between-g5-staging` with `wrangler d1 export --remote` and the
+   checked-in `wrangler.staging.jsonc` into a private folder outside Git.
+3. Record the SHA-256, UTC time, Wrangler version, migration list, actual
+   `PRAGMA table_list` inventory, per-existing-table row counts and
+   `PRAGMA foreign_key_check;` output. Do not assume the database is empty or
+   that all migrations/tables exist; record absent tables as absent.
+4. Keep the sensitive SQL and evidence private until the invited test and
+   rollback window are closed. A Time Travel bookmark is supplementary, not a
+   replacement for the export.
 
-2. Confirm the proposed preview route has not been provisioned accidentally.
-   Keep the existing G1–G4 GitHub Pages site and DigiWongaDude.com unchanged.
-3. Export staging D1 to a private, access-controlled folder before any remote
-   migration. Do not put the export in Git, a frontend folder, chat or an issue:
-
-   ```text
-   npx wrangler d1 export between-g5-staging --remote --config wrangler.staging.jsonc --output <private-backup>/between-g5-staging-<UTC>.sql
-   npx wrangler d1 migrations list between-g5-staging --remote --config wrangler.staging.jsonc
-   ```
-
-   Record the backup checksum, UTC time, migration list and row counts for
-   tables that exist: `travellers`, `visits`, `discoveries`, `commands`, and
-   any account/invitation tables already migrated, plus
-   `PRAGMA foreign_key_check;`. Record not-yet-created tables as absent rather
-   than querying them. Keep the backup until the
-   invited test and rollback window are closed.
+CODiE does not run the export, remote SQL, migration, restore or deployment.
 
 ## C. Google Cloud configuration (Paul/Sara, no secrets in Git)
 
