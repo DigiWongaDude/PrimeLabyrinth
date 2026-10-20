@@ -159,6 +159,67 @@ npx wrangler d1 migrations apply between-g5-staging --remote --config wrangler.s
 npx wrangler deploy --config wrangler.staging.jsonc
 ```
 
+### D.1 Paul-only migration/deployment gate
+
+These are **remote actions**, unlike the local migration rehearsal and Worker
+dry-run. Paul should run them from a clean checkout of the reviewed
+`codex/g5-persistence` branch, in the repository root, after verifying the
+private backup metadata and the exact source SHA. CODiE must not run either
+command.
+
+Before applying anything, run the read-only preflight:
+
+```powershell
+git status --short
+git rev-parse HEAD
+npx wrangler d1 migrations list between-g5-staging --remote --config .\wrangler.staging.jsonc
+```
+
+Expected preflight for the current staging database: a clean tree, the reviewed
+source SHA, and only `0003_accounts.sql` plus `0004_invitations.sql` listed as
+pending. If any other migration appears, the database name/ID differs, the
+backup checksum does not match, or either account flag is not `false`, stop for
+Sara/Paul review.
+
+When Paul explicitly approves the migration, run the following separately and
+accept Wrangler's confirmation only after checking the displayed database is
+`between-g5-staging`:
+
+```powershell
+npx wrangler d1 migrations apply between-g5-staging --remote --config .\wrangler.staging.jsonc
+```
+
+That command changes remote D1 state; it is not a dry-run. Verify the migration
+list and foreign-key check before the separate Worker release. The Worker
+deployment is a second, independent remote action:
+
+```powershell
+npx wrangler deploy --config .\wrangler.staging.jsonc
+```
+
+The checked-in dry-run must already show `env.DB (between-g5-staging)`,
+`nodejs_compat`, the confirmed Pages origin, `ACCOUNTS_ENABLED="false"` and
+`REGISTRATION_ENABLED="false"`. Do not add `--remote` to the dry-run and do
+not treat a successful dry-run as a deployment.
+
+After deployment, stop and keep both flags closed if any of the following fail:
+
+- `GET /` is not HTTP 200 with the Minotaur entrance and the exact
+  `https://digiwongadude.com/between/assets/minotaur-access-denied.png` asset;
+- the confirmed Pages origin cannot reach the closed-state health endpoint, or
+  a foreign/missing origin is accepted;
+- `/v1/auth/config` is not `503 accounts_disabled` while accounts are closed;
+- the post-migration foreign-key check or immutable exploration-ledger checks
+  are not clean.
+
+For rollback, Paul should keep registration closed, restore the last reviewed
+compatible Worker version from Cloudflare's version history, preserve the
+additive D1 tables and spent-invitation records, and escalate any data repair
+to a separately approved recovery plan. Do not drop tables or restore the SQL
+backup as a routine deployment rollback. Hosted invitation issuance/delivery is
+still **NOT YET SOLVED**, and no Google secrets or OAuth configuration changes
+are part of this gate.
+
 Before the deploy, verify the source dry-run has resolved the staging D1,
 `REQUEST_LIMIT`, `CREATE_LIMIT`, the preview allowlist and both flags set to
 `false`. Afterward verify:
