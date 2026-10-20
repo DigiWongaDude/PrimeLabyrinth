@@ -423,3 +423,59 @@ Paul will manually switch you to **5.6 Luna High**. When Paul says "Carry on COD
 4. Commit and push changes to this feature branch, update handoff with exact commands/results, and STOP for Sara review. Flag any substantive security or architecture question rather than improvising; say **"Switch me over to Astra High"** if it truly requires Astra, and wait for Paul's manual switch and "Carry on CODiE".
 
 **Hard boundaries:** no deployment, remote migration, secrets, Cloudflare/DNS/account settings, registration enablement, production merge, or model switching by CODiE. Both flags remain OFF; preserve the Minotaur and public first-discovery history. Paul alone authorises and performs deployments. Sara's inspection so far is preliminary, not a deployment approval.
+
+### CODiE to Sara — bounded Luna tooling and smoke repair, 2026-10-20
+
+Implemented only the bounded follow-up from your instruction on top of
+`79522a7`. The changes are local-only; no hosted invitation was minted and no
+remote D1, Worker, Cloudflare setting, secret, DNS record or registration flag
+was changed.
+
+**DONE:** `tools/invitations-local.mjs` provides private `issue` and `revoke`
+commands. It generates 32 CSPRNG bytes, hashes with
+`between:g5:staging:invite:v1:`, applies a 48-hour default and seven-day maximum
+TTL, and sends digest-only SQL through the local Wrangler D1 runtime. The raw
+token is written only to a caller-selected output outside the repository (mode
+0600 on POSIX; default Windows user-temp output relies on the account's private
+NTFS ACL). The helper never accepts a raw token as an argument, never prints it,
+and deletes its temporary SQL directory. If delivery-file creation fails after
+the row is inserted, it attempts an immediate local revocation before returning
+the original error. Focused tests cover token length/digest secrecy, TTL and
+path bounds, file permissions, and revoke validation.
+
+`smoke.mjs` now requires the local invitation-aware Worker, signs up two
+disposable accounts through invitation admission, checks ROOT → 0 → 00 travel,
+logs the first account in from a second storage context, verifies shared counts,
+and probes `/v1/travellers` to confirm unknown credentials return
+`use_account_signup`. Invitation files are deleted after use. It rejects any
+non-local API URL. `staging-smoke.mjs` no longer assumes an empty archive; it
+compares archive statistics before and after its non-mutating probes.
+
+**Actually run:**
+
+- `npm run migrate:local`: PASS; applied local `0004_invitations.sql`, 19
+  commands. This touched only `.wrangler/state` local data.
+- `node --test tests/invitations-operator.test.mjs`: **2/2 PASS**, exit 0.
+- `npm run smoke:local`: PASS; disposable local accounts, second-device login,
+  path travel, shared archive invariants and anonymous-route denial all passed.
+- `npm test`: **71/71 PASS**, 7/7 files, exit 0, 10.81 seconds.
+- `npm run test:client`: **22/22 PASS**, zero failed/skipped/cancelled, exit 0,
+  520.642 ms. This includes the two operator tests.
+- `npm run check`: PASS, exit 0.
+- `npm run build:api`: PASS, exit 0, dry-run only, 73.34 KiB / 19.72 KiB gzip.
+- `npx wrangler deploy --config wrangler.staging.jsonc --dry-run --outdir .worker-build/staging`:
+  PASS, exit 0, 73.34 KiB / 19.72 KiB gzip; both account flags false; no upload.
+- `git diff --check`: PASS, with normal LF-to-CRLF conversion notices.
+- No hosted smoke test, deployment, remote migration or configuration change.
+
+**PARTIAL / REVIEW:** the helper is intentionally a local operator tool, not a
+public issuer. Review the Windows ACL assumption and SQL/Worker release ordering
+before using it around any real staging data. The smoke flow adds two disposable
+local accounts per run; local D1 state is ignored by Git and may be cleared by
+the operator when desired.
+
+**NOT STARTED:** real Google sign-in, hosted two-device/attribution acceptance,
+mobile/browser visual QA, secure hosted invitation delivery, independent
+security review and deployment. `staging-smoke.mjs` was reviewed but not
+executed, as required. Stop here for Sara review; Paul retains deployment and
+remote migration authority.

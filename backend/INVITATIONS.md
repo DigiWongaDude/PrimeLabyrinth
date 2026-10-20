@@ -66,17 +66,22 @@ legacy tests seed identities before migration 0004. There is no test-only HTTP
 admission bypass. The UI handler tests are DOM-stub tests, not a hosted/mobile
 browser sign-in. See `SARA-CODIE-NOTES.md` for exact commands/counts/SHAs.
 
-The historical `smoke.mjs` / `npm run smoke:local` still tries to create legacy
-travellers and is incompatible with this intentional route closure. Do not use
-it to validate invitation accounts; use the local Vitest account/route suites.
-Updating that operator smoke flow awaits secure invitation fixture provisioning.
-`staging-smoke.mjs` now expects `use_account_signup` for unknown legacy tokens,
-but still assumes an empty archive and is only for Paul's approved hosted check.
+`smoke.mjs` now uses the private helper to issue disposable local invitations,
+signs up two accounts, checks two-device continuity, and verifies the retired
+anonymous route. It requires `npm run migrate:local` and a running
+`npm run dev:accounts`; it never targets a hosted URL. `staging-smoke.mjs` now
+compares archive statistics before and after probes instead of assuming an empty
+archive. Do not execute that hosted script without Paul's approved staging check.
 
-The private operator issuance/revocation utility and secure delivery-file
-permissions are **not implemented**. Do not improvise raw invitations in shell
-arguments, console output, Git, public URLs or database SQL exports. Public
-waiting-list work remains out of scope. Real Google sign-in, hosted two-device
-continuity, browser visual QA, independent security review and Paul-approved
-deployment/remote migration remain release gates. Local tests do not establish
-that the live API has this gate.
+`tools/invitations-local.mjs` is a private local issuance/revocation helper. It
+uses Node CSPRNG bytes, the versioned digest domain, a 48-hour default TTL and
+the seven-day SQL maximum. It calls Wrangler against local D1 with digest-only
+SQL, writes the raw token only to a restrictive output file outside the repo,
+and revokes the row if delivery-file creation fails. Use `issue --out PATH` and
+`revoke --id UUID`; never place raw tokens in shell arguments, console output,
+Git, public URLs or SQL exports. On Windows, use the default user temp output or
+an operator-controlled directory with a private NTFS ACL. Delete the output file
+after secure delivery. Public waiting-list work remains out of scope. Real Google
+sign-in, hosted two-device continuity, browser visual QA, independent security
+review and Paul-approved deployment/remote migration remain release gates. Local
+tests do not establish that the live API has this gate.
