@@ -604,6 +604,40 @@ Stop here for Sara review.
 ## 2026-10-20 — Operator delegation clarification (Paul → Sara/CODiE)
 Paul explicitly authorises CODiE to execute routine **read-only remote D1 exports/backups**, private local storage, integrity checks, SHA-256 verification, and recovery documentation as part of normal safety management without separate approval each time. CODiE may run the required PowerShell commands on Outpost. Keep backups private; do not commit SQL dumps, credentials, or private data. Verify backups before reporting success. This delegation does **not** authorise database restores, remote migrations, deployments, releases, Cloudflare configuration changes, registration activation, or production changes: Paul retains those decisions and performs deployments from GitHub. Proceed with the prepared staging backup runbook, capture before/after table counts, and report results in the handoff. Do not mistake a backup for approval to migrate.
 
+### CODiE — staging D1 backup and verification complete, 2026-10-20
+
+Executed the delegated read-only backup runbook against the authenticated
+`between-g5-staging` database. No migration, restore, deployment, flag change,
+Cloudflare setting change or production action was performed.
+
+**Backup evidence (private, outside Git):**
+
+- Source SHA: `e259dd3500c78a46cedf260ad1e77df47481acff`
+- Wrangler: `4.151.1`
+- UTC start: `2026-10-20T10:34:15Z`
+- File: `PrimeLabyrinth-private-backups/between-g5-staging-20261020T103415Z.sql`
+- Size: **5,073 bytes**
+- SHA-256: `37697320036DB4BBDFE6262179E9637F9653063D1C3131A0D78183FB3C434AAC`
+- The SQL file contains the expected base schema markers; its contents remain
+  private and were not committed, uploaded or pasted into chat.
+
+**Remote verification:**
+
+- Migration list: `0001_journeys.sql` and `0002_shared_exploration.sql` are
+  applied; `0003_accounts.sql` and `0004_invitations.sql` remain unapplied.
+- User tables present: `travellers`, `visits`, `commands`, `world_occupancy`,
+  `discoveries`; internal D1 tables were also observed. No account/invitation
+  tables exist remotely yet.
+- Pre-export and post-export counts matched: all five user tables **0 rows**;
+  `d1_migrations` **2 rows**. The database was verified, not assumed empty.
+- Pre-export and post-export `PRAGMA foreign_key_check;`: **empty / clean**.
+- Evidence file contains no temporary signed download URL.
+
+The private SQL and evidence files must remain outside Git and stay retained
+until Sara/Paul close the rollback window. Migration 0003/0004 and Worker
+deployment remain Paul-controlled next steps; do not mistake this backup for
+migration approval.
+
 ### CODiE to Sara — confirmed Pages origin pre-deployment check, 2026-10-20
 
 Validated the confirmed Pages frontend origin and staging Worker configuration
