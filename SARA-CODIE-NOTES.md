@@ -834,3 +834,69 @@ Paul says “get going” following successful closed-state staging Worker deplo
 4. Deliver a concise recommended sequence and identify whether an **Astra High security architecture review** is truly necessary before implementation. If substantive auth/issuance architecture work is required, STOP and say exactly `Switch me over to Astra High`; await Paul manually switching and saying `Carry on CODiE`. Otherwise complete only the bounded docs/options, commit/push, report to Sara, and stop.
 
 **Hard boundaries:** no remote D1 writes, invitation issuance, OAuth changes, Worker/Pages deployments, account/registration enablement, production changes, autonomous model switching, or real tokens in Git/chat. Existing account/registration flags stay OFF.
+
+### CODiE to Sara — hosted invitation security design review, 2026-10-20
+
+Paul acknowledged the requested manual switch. Completed the bounded local
+design review, not a hosted implementation or enablement. Reviewed source:
+`f630af8f65ef7d4bb41f4a73235fe49a1e46c1bc`, branch
+`codex/g5-persistence`; checkout was clean and fetch found no newer branch
+commit. This entry and the plan/runbook corrections are documentation only.
+
+**DONE**
+
+- Reviewed `tools/invitations-local.mjs`, migration 0004, backend Google routes,
+  browser callback/storage handling and committed staging config. Both flags
+  are still false in that config; no fresh remote-state check was performed.
+- Revised `G5-HOSTED-INVITATION-OAUTH-PLAN.md` with pinned D1 target/preflight,
+  bound SQL using database-time TTL, explicit approval, durable operation
+  states and UUID reconciliation after uncertain writes/revocations.
+- Defined native Windows DACL/owner/path validation before saving any token.
+  Node chmod is insufficient on Windows. Existing local helper skips the ACL
+  check, writes the database before token output, and suppresses compensation
+  failure; it must NOT be converted to remote by changing CLI flags.
+- Corrected the earlier expectation that a query response echoes the D1 ID.
+  Verify metadata and pinned request target instead. Account-level D1
+  Edit/Write must not be advertised as single-database credential isolation.
+- Checked current official Google documentation: `openid email` is exempt from
+  the Testing test-user-list restriction. Our invitation checks/flags are the
+  admission gate; invites are bearer credentials, not named-user bindings.
+  The exact Pages callback remains
+  `https://between-g5-preview.pages.dev/index.html`.
+- Corrected the staging runbook's obsolete candidate URL and test-window
+  sequencing. Official-source links are in the plan/runbook.
+
+**CHECKS ACTUALLY RUN**
+
+- `npm test`: **71 passed, 0 failed**, all **7 test files passed**, exit 0.
+- `npm run test:client`: **23 passed, 0 failed**, 0 skipped/cancelled, exit 0.
+- Tested source SHA: `f630af8f65ef7d4bb41f4a73235fe49a1e46c1bc`.
+  Only documentation changed afterward; no executable source changed.
+- Neither test run printed warnings. These suites use disposable local
+  fixtures/mocked Google, not hosted invitations or real Google sign-in.
+- `git diff --check`: pass; Git printed LF-to-CRLF conversion notices only.
+- No Wrangler dry-run was needed/run for this documentation-only review.
+
+**PARTIAL / NOT STARTED / LEFT FOR SARA**
+
+- Design reviewed; hosted issuer is **NOT IMPLEMENTED / NOT READY**.
+- Native Windows ACL enforcement, private durable journal, bounded API
+  credential injection and recovery transport still need implementation and
+  local fault-injection tests. Existing passing tests do not cover these.
+- Credentials are not provisioned. Paul must approve their actual account/D1
+  scope. Do not read/copy Wrangler's cached OAuth credential.
+- Real Google configuration, private hosted delivery, invitation issuance and
+  hosted password/Google/linking/two-device acceptance remain NOT STARTED.
+- Sara: review the amended plan, then propose a bounded local implementation
+  milestone. Preserve explicit Paul approval for every remote mutation and
+  test-window flag change. No additional model switch requested.
+
+**BROKEN / SECURITY LIMITATIONS**
+
+No new runtime regression found. The old plan's Windows-privacy assumption,
+ambiguous-write recovery and named Google test-user restriction were unsafe
+assumptions and are now corrected in documentation, not implemented fixes.
+This is not a blanket authentication security certification.
+
+No Cloudflare/Google configuration, deployment, database write/restore,
+registration activation, Minotaur asset or production change occurred.

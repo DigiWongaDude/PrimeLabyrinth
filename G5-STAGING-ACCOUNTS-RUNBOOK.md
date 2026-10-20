@@ -14,8 +14,9 @@ passing. **Hosted invitation issuance and delivery are NOT YET SOLVED.**
 The [invitation implementation](backend/INVITATIONS.md) and
 `tools/invitations-local.mjs` are local/review tooling only. Do not point the
 local helper at remote D1 or issue real hosted invitations. Do not enable
-registration until the separate hosted operator plan, secure delivery, Google
-configuration, acceptance tests and Paul's approval are satisfied. The
+registration until the separate hosted operator plan, secure delivery, local
+acceptance checks and Paul's explicit test-window approval are satisfied.
+Real hosted acceptance follows that controlled opening, not before it. The
 historical candidate-origin and “pending migration 0004” statements below are
 pre-deployment context; use the verified values above for the current staging
 environment. See `G5-HOSTED-INVITATION-OAUTH-PLAN.md` for the next gates.
@@ -38,9 +39,9 @@ an OAuth origin.
 
 ## A. Isolated Pages preview preparation (Paul only)
 
-This is a click-by-click preparation checklist. CODiE has not created a Pages
-project, deployed a preview, changed Cloudflare settings or configured OAuth.
-The candidate hostname above is **not real until the dashboard confirms it**.
+This is the retained initial preparation checklist. Paul has since confirmed
+the deployed Pages frontend at `https://between-g5-preview.pages.dev`.
+Do not create a duplicate project; reuse that confirmed staging target.
 
 1. Build the preview from a clean checkout of `codex/g5-persistence`:
 
@@ -124,18 +125,20 @@ CODiE does not run the export, remote SQL, migration, restore or deployment.
 ## C. Google Cloud configuration (Paul/Sara, no secrets in Git)
 
 1. In the approved Google Cloud project create/select a **Web application** OAuth
-   client. Restrict the consent-screen audience to named test users while this
-   is staging.
+   client. Use Testing and nominate staging testers, but do not treat the test
+   list as an admission boundary: Google's basic `openid email` scopes are
+   exempt from its test-user restriction. Invitations remain mandatory for new
+   accounts. See the reviewed hosted plan and
+   [Google's audience exception](https://support.google.com/cloud/answer/15549945).
 2. Add this exact authorised redirect URI, byte-for-byte:
 
    ```text
-   https://<confirmed-pages-origin>/index.html
+   https://between-g5-preview.pages.dev/index.html
    ```
 
-   Add the exact JavaScript origin `https://<confirmed-pages-origin>` where
-   Google requests it, only after confirming the Pages project and branch alias.
-   Substitute the dashboard's real hostname; do not enter the unconfirmed
-   candidate, API origin or Minotaur root.
+   Add the exact JavaScript origin `https://between-g5-preview.pages.dev`.
+   Do not add a branch alias, API origin or Minotaur root. This step still
+   requires Paul's separate approval; no Google settings changed in this review.
 3. Put the public client ID and redirect URI in the staging Worker vars. Put the
    client secret only into the Cloudflare secret store, never into JSON, GitHub,
    the browser bundle or chat:
@@ -243,9 +246,10 @@ Paul may approve deployment and invitation redemption. Record the exact Worker
 version and flags. Use privately issued disposable invitations for new password
 and Google accounts. The backend must reject direct API signup without a valid
 invitation even when the caller supplies an allowed Origin. Frontend Access
-alone cannot provide this guarantee, and Google test users do not gate password
-signup. Keep registration closed until the code and migration provide this
-enforcement; close it again at the end of testing.
+alone cannot provide this guarantee, and Google's test-user list does not gate
+password signup or this app's basic OpenID scopes. Keep registration closed
+until the code and migration provide this enforcement; close it again at the
+end of testing.
 
 ### Password account
 
