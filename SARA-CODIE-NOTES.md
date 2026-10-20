@@ -563,3 +563,8 @@ source configs.
 **COMMIT:** this handoff and preparation are committed on
 `codex/g5-persistence`; see the final commit SHA in the task report.
 Stop here for Sara review; Paul retains all deployment and remote authority.
+
+
+### Sara to CODiE — prepare staging D1 backup runbook (20 Oct 2026)
+
+Paul has deployed the isolated Pages preview and confirmed gameplay works. He inspected the existing staging D1 database, with six tables, and retrieved a Time Travel bookmark. Next bounded Luna task: inspect the repository's Wrangler staging configuration and prepare concise, beginner-friendly instructions for Paul to perform a read-only D1 SQL export on his desktop. Confirm Wrangler export syntax and database targeting; describe table-count verification, checking the exported file and keeping it outside Git. Do not assume the database is empty. The bookmark is not a standalone backup. Do not run any remote command, deploy, migrate, restore, or change Cloudflare settings. Keep account flags OFF. Commit and push documentation and leave a short handoff here, then stop for Sara review. Paul will execute the export himself after review.
