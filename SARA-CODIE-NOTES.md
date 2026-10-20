@@ -692,3 +692,68 @@ Paul says “carry on” after confirming successful authenticated, independentl
 5. Update handoff notes with concise evidence and any runbook corrections; commit/push only documentation or necessary local code fixes, then STOP for Sara/Paul review.
 
 **HARD STOP:** CODiE must NOT run remote migrations, deploy, change Cloudflare settings, enable accounts/registration, restore backups, or change model autonomously. Paul alone performs and explicitly authorises remote mutations. Do not mistake “carry on” for migration approval.
+
+### CODiE — final local migration rehearsal and staging dry-run, 2026-10-20
+
+Completed Sara's bounded verification request. No remote migration, restore,
+deployment, Cloudflare setting/secret change, OAuth change or flag change was
+performed.
+
+**Checkout and backup evidence**
+
+- Branch: `codex/g5-persistence`; clean reviewed source before the documentation
+  update: `ae8a44f521d6904b2e2786f1fb29b3d4b6bebfff`.
+- The documentation-only operator-gate commit is
+  `4399742ae04a1575256e89f5fce54a7cc20ef2d7`, pushed to the same branch.
+- Staging Worker: `between-g5-staging-api`; D1 binding/name:
+  `DB -> between-g5-staging`; database ID remains
+  `8280b0ec-4f1c-42e9-918f-613c7578c83c`.
+- Private export remains outside Git and its SHA-256 re-check matches:
+  `37697320036DB4BBDFE6262179E9637F9653063D1C3131A0D78183FB3C434AAC`.
+- Read-only remote migration inventory: `0001_journeys.sql` and
+  `0002_shared_exploration.sql` applied; `0003_accounts.sql` and
+  `0004_invitations.sql` pending. No remote SQL was run.
+
+**Fresh local D1 rehearsal**
+
+Used a new temporary `--persist-to` directory and applied exactly
+`0001_journeys.sql` → `0002_shared_exploration.sql` → `0003_accounts.sql` →
+`0004_invitations.sql`. Wrangler reported 11, 9, 13 and 19 commands successful
+respectively. The final local tracking table contains all four migrations and
+`npx wrangler d1 migrations list --local` reports no migrations to apply.
+
+- Schema inspection: 16 expected non-SQLite tables and 19 triggers, including
+  account, profile, session, OAuth, invitation and legacy-eligibility objects.
+- `PRAGMA foreign_key_check;`: empty / clean.
+
+**Checks actually run**
+
+- `npm run test:client`: **23/23 pass**, 0 fail, exit 0.
+- `npm test`: **71/71 pass**, 7/7 files, 0 fail, exit 0.
+- `npm run check`: pass, exit 0.
+- `npm run build:api`: pass, dry-run only, 73.34 KiB / 19.72 KiB gzip,
+  exit 0.
+- `npx wrangler deploy --config .\\wrangler.staging.jsonc --dry-run`: pass,
+  73.34 KiB / 19.72 KiB gzip; resolved `env.DB (between-g5-staging)`, both
+  rate limits, `nodejs_compat`, compatibility date `2026-10-18`,
+  `ALLOWED_ORIGINS` containing the confirmed
+  `https://between-g5-preview.pages.dev` plus the staging API origin, and
+  `ACCOUNTS_ENABLED="false"` / `REGISTRATION_ENABLED="false"`.
+- Read-only existing staging `GET /`: **HTTP 200**, response contains the
+  Minotaur asset marker `minotaur-access-denied.png`. This was not a new
+  deployment.
+- `git diff --check`: pass.
+
+Wrangler printed a local EPERM warning while attempting to write its diagnostic
+log under the sandbox's roaming profile; each affected command still completed
+successfully and the warning did not change the test results. No project file
+was left modified by type generation or dry-runs.
+
+**Paul-only next actions / blockers**
+
+The runbook now contains the exact separated preflight, remote migration,
+Worker deployment, smoke-gate and rollback commands in section D.1. Paul must
+perform and explicitly approve those remote actions from a clean reviewed
+checkout. Hosted invitation issuance/delivery remains **NOT YET SOLVED**;
+Google secrets/OAuth configuration remain unset; both account flags must stay
+OFF. Stop for Sara/Paul review before any remote mutation.
