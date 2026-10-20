@@ -5,7 +5,13 @@ import { body, exact, fail, hash } from './http';
 import { invitationDigest, requireInvitation } from './invitations';
 
 type DB = D1DatabaseSession;
-export type AccountEnv = Env & { GOOGLE_CLIENT_SECRET?: string };
+export type AccountEnv = Env & {
+  GOOGLE_CLIENT_SECRET?: string;
+  TURNSTILE_SECRET?: string;
+  TURNSTILE_EXPECTED_HOSTNAME?: string;
+  TURNSTILE_EXPECTED_ACTION?: string;
+  INVITATION_REQUESTS_ENABLED?: string;
+};
 type Account = { traveller_id:string; username:string|null; password_hash:string|null;
   google_sub:string|null; recovery_hash:string; version:number };
 export type Identity = { id:string; active_path:string; revision:number; session_hash:string|null;

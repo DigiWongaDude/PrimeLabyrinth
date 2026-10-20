@@ -7,7 +7,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 export const STAGING_API = 'https://between-g5-staging-api.digiwongadude.workers.dev';
 export const PREVIEW_FILES = [
   'index.html', 'style.css', 'app.js', 'engine.js', 'view.js',
-  'journey-client.js', 'account-client.js'
+  'journey-client.js', 'account-client.js', 'invitation-request.html',
+  'invitation-request.js', 'invitation-request-config.js'
 ];
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 

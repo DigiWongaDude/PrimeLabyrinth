@@ -1039,3 +1039,86 @@ Future separate milestone: public request form on DigiWongaDude.com (name/nickna
 **Scope and sequence:** (1) Inspect existing issuer/worker/front-end, propose minimal architecture and mail provider/sender integration; (2) implement bounded local Worker/D1 queue + Turnstile verification + durable email outbox + request form as an additive page/component in repo, without touching external live website; (3) private approval integration with hosted issuer or explicitly report blocker if coupling unsafe; (4) tests covering spam, duplicate, expiry, retry, failed mail, ambiguous delivery, unauthorised approval, closed flags, and original game regressions; (5) document a separately approved staging launch checklist, including actual mail provider setup, DNS risk to IONOS/Outlook, privacy/retention, deliverability and controlled live smoke. No unreviewed broad refactor. Prior native hosted issuer is not independently security-audited: do not call it production ready.
 
 **Hard stops:** no Cloudflare D1 remote writes/migrations, no Pages/Worker deploy, no Cloudflare/Google/IONOS/DNS/email configuration, no live email sending, no enabling either flag, no production change, no secrets or credentials, no hosted invitation mint. Keep Minotaur GET / and existing staging game functional. Local tests/builds and commits to the feature branch are permitted. Report exact changed files, checks and any required Paul decisions, then STOP. Do not silently change the live domain. If a decision about a third-party sender or mailbox capability is needed, document options and pause that integration rather than guessing.
+
+
+### CODiE to Sara — local invitation request and approval/outbox workflow complete (2026-10-20)
+
+**READY FOR SARA REVIEW — LOCAL ONLY.** Implemented from assignment commit
+`8170f3e` on `codex/g5-persistence`. No remote D1 read/write, migration,
+deployment, DNS/Cloudflare/Google/IONOS change, secret upload, live email send,
+account flag change or Minotaur change occurred. The default request flag and
+both account flags remain `false` in committed configs.
+
+**DONE**
+
+- Added local-only migration `0005_invitation_requests.sql` with private
+  request queue, per-IP/email limiter, durable ACK/REVIEW/INVITATION outbox,
+  approval record, issuance state and delivery state. Active-email and
+  request-kind uniqueness guards prevent duplicate approval/mail work.
+- Added `backend/invitation-requests.ts` and a Worker `POST
+  /v1/invitation-requests` route. It validates bounded fields and privacy
+  acknowledgement, enforces the existing origin policy, requires the local
+  request flag, validates Turnstile server-side (secret never returned), checks
+  expected hostname/action and fresh challenge timestamp, applies fixed-window
+  IP/email limits, and returns a privacy-preserving generic `202` for active
+  duplicates and replays.
+- Turnstile tokens are hashed only for single-use/replay detection; no token,
+  provider payload or raw exception is logged. The queue atomically creates a
+  requester ACK and human-review notice for `invitations@digiwongadude.com`;
+  neither is sent by this code.
+- Added private local approval/state functions: idempotent approval/rejection,
+  invitation issuance acknowledgement, explicit issuance `UNKNOWN`, outbox
+  claim, definitive failure retry, provider `SENT`, and ambiguous `UNKNOWN`.
+  No public admin/approval route exists. The invitation token remains outside
+  D1/URLs/browser/logs; only the non-secret invitation ID is recorded.
+- Added additive `invitation-request.html`, `invitation-request.js` and empty
+  public `invitation-request-config.js`; the page is disabled until a separately
+  approved Turnstile site key/API origin/provider is configured. Added a link
+  from the game and included the safe files in the local server/Pages preview
+  allowlist. No live website was edited.
+- Added `INVITATION-REQUESTS.md` with threat boundary, state machine, provider
+  options, privacy/retention questions and Paul-only staging checklist.
+
+**CHECKS ACTUALLY RUN**
+
+| Check | Result |
+| --- | --- |
+| focused request suite | **9 passed, 0 failed** |
+| `npm test` | **86 passed, 0 failed; 9/9 files passed** |
+| `npm run test:client` | **51 passed, 0 failed, 0 skipped/cancelled** |
+| `npm run check` | PASS: Wrangler types + TypeScript |
+| `npm run build:api` | PASS: local dry-run only, 79.45 KiB / 20.99 KiB gzip |
+| staging Wrangler dry-run | PASS: staging D1/origins resolved; request/accounts/registration flags false |
+| `npm run build:pages-preview` | PASS: isolated preview with 11 safe files |
+| `git diff --check` | PASS |
+
+The focused tests use fake Turnstile responses and local D1 only. They cover
+hostname/action/expiry/configuration failure, malformed/privacy/origin/method
+rejection, duplicate and concurrent submissions, replay neutrality, rate
+limits, no token persistence, private/no-public approval, approval idempotency,
+one invitation workflow item, issuance unknown, failed-mail retry, ambiguous
+delivery and durable delivery state. Existing account/Google, invitation,
+ledger, Minotaur and native Windows operator tests remain green.
+
+**PARTIAL / NOT STARTED / LEFT FOR SARA AND PAUL**
+
+- No real Turnstile site key/secret, sender provider, Microsoft Graph/Outlook
+  automation, Cloudflare Email Service, SPF/DKIM/DMARC, D1 remote migration or
+  private operator UI is configured. The outbox adapter and hosted issuer
+  hand-off remain intentionally manual; the Worker cannot mint or email an
+  invitation. A future adapter must reconcile provider `UNKNOWN` without blind
+  resend and must use the existing hosted issuer only after its separate review.
+- Request email/message are private D1 moderation PII. Paul must approve
+  retention, at-rest protection, access, deletion and privacy wording before a
+  remote migration. No public request route reads or lists it.
+- Sara should review the migration, Turnstile checks, neutral duplicate
+  behavior, approval idempotency and provider contract. Paul must separately
+  approve the hostname/path, Turnstile configuration, D1 backup/migration,
+  sender/provider, disposable mailbox smoke and any temporary staging flag.
+
+**WARNINGS / LIMITATIONS**
+
+Wrangler commands printed the known sandbox EPERM diagnostic-log write warning;
+all commands completed successfully. No credential, token, backup or provider
+payload is in the commit. No claim is made that hosted email, Turnstile or the
+public domain is ready.

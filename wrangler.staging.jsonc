@@ -16,6 +16,7 @@
     "ACCOUNTS_ENABLED": "false",
     "GOOGLE_CLIENT_ID": "",
     "GOOGLE_REDIRECT_URI": "",
+    "INVITATION_REQUESTS_ENABLED": "false",
     "MAX_TRAVELLERS": "10"
   },
   "d1_databases": [{

@@ -1,7 +1,7 @@
 // Local-only static preview. Never exposes backend files, credentials or .git.
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-const files=new Set(['index.html','style.css','app.js','engine.js','view.js','journey-client.js','account-client.js','g5-config.js']);
+const files=new Set(['index.html','style.css','app.js','engine.js','view.js','journey-client.js','account-client.js','g5-config.js','invitation-request.html','invitation-request.js','invitation-request-config.js']);
 const types={html:'text/html',css:'text/css',js:'text/javascript'};
 createServer(async(req,res)=>{
   const name=new URL(req.url,'http://localhost').pathname.slice(1)||'index.html';

@@ -2,6 +2,7 @@
 import { targets, encodePath, decodePath } from '../engine.js';
 import { ApiError } from './http';
 import { authenticate, accountRoute, type AccountEnv } from './accounts';
+import { invitationRequestRoute } from './invitation-requests';
 
 type Traveller = { id: string; active_path: string; revision: number };
 type Visit = { path: string; canonical_path: string; parent_path: string | null; a: number; b: number; c: number; discovered_at: string };
@@ -176,6 +177,7 @@ img { display: block; width: 100%; max-width: 900px; height: auto; }
       const ip = request.headers.get('CF-Connecting-IP') || 'local';
       if (!(await env.REQUEST_LIMIT.limit({key:ip})).success) fail(429,'rate_limited');
       if (route === '/v1/health' && request.method === 'GET') return respond({ok:true,generation:5});
+      if (route === '/v1/invitation-requests') return respond(await invitationRequestRoute(request,env,env.DB.withSession('first-primary'),ip),202);
       const db = env.DB.withSession('first-primary');
       if (route === '/v1/exploration' && request.method === 'GET') return respond(await exploration(db));
       if (route === '/v1/discovery' && request.method === 'GET') {

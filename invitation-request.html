@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; frame-src https://challenges.cloudflare.com; connect-src 'self' https: http://localhost:8787; base-uri 'none'; form-action 'self'">
+  <title>The Between — Request an invitation</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="request-page">
+  <main class="request-card">
+    <p class="eyebrow">THE BETWEEN / THRESHOLDS</p>
+    <h1>Request an invitation</h1>
+    <p>Leave a note for Paul. A request is not an account, admission, or marketing subscription. Every request is reviewed privately.</p>
+    <form id="invitation-request-form" novalidate>
+      <label for="request-name">Display name</label>
+      <input id="request-name" name="displayName" maxlength="40" autocomplete="nickname" required>
+      <label for="request-email">Email</label>
+      <input id="request-email" name="email" type="email" maxlength="254" autocomplete="email" required>
+      <label for="request-message">Optional message</label>
+      <textarea id="request-message" name="message" maxlength="1000" rows="5"></textarea>
+      <label class="check"><input id="request-privacy" name="privacyAccepted" type="checkbox" required> I understand this is a private invitation request, not an account or subscription.</label>
+      <div id="turnstile-widget" aria-label="Bot protection"></div>
+      <button type="submit">Send request</button>
+    </form>
+    <p id="request-status" role="status" aria-live="polite"></p>
+    <p><a href="index.html">Return to THE BETWEEN</a></p>
+  </main>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" defer></script>
+  <script type="module" src="invitation-request.js"></script>
+</body>
+</html>
