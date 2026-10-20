@@ -599,3 +599,7 @@ review.
 keep the SQL/evidence outside Git and private, and send Sara only metadata,
 checksums, migration/table inventory, counts and foreign-key result—not SQL.
 Stop here for Sara review.
+
+
+## 2026-10-20 — Operator delegation clarification (Paul → Sara/CODiE)
+Paul explicitly authorises CODiE to execute routine **read-only remote D1 exports/backups**, private local storage, integrity checks, SHA-256 verification, and recovery documentation as part of normal safety management without separate approval each time. CODiE may run the required PowerShell commands on Outpost. Keep backups private; do not commit SQL dumps, credentials, or private data. Verify backups before reporting success. This delegation does **not** authorise database restores, remote migrations, deployments, releases, Cloudflare configuration changes, registration activation, or production changes: Paul retains those decisions and performs deployments from GitHub. Proceed with the prepared staging backup runbook, capture before/after table counts, and report results in the handoff. Do not mistake a backup for approval to migrate.
