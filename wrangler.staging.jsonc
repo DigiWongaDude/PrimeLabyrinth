@@ -1,0 +1,47 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "between-g5-staging-api",
+  "account_id": "afef76524a17ba7db8f11d31b56d215a",
+  "main": "backend/worker.ts",
+  "compatibility_date": "2026-10-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    // Confirmed isolated Pages preview origin; the existing staging API origin
+    // remains allowlisted for direct staging checks.
+    "ALLOWED_ORIGINS": "https://between-g5-preview.pages.dev,https://between-g5-staging-api.digiwongadude.workers.dev",
+    "REGISTRATION_ENABLED": "false",
+    "ACCOUNTS_ENABLED": "false",
+    "GOOGLE_CLIENT_ID": "",
+    "GOOGLE_REDIRECT_URI": "",
+    "INVITATION_REQUESTS_ENABLED": "false",
+    "MAX_TRAVELLERS": "10"
+  },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "between-g5-staging",
+    "database_id": "8280b0ec-4f1c-42e9-918f-613c7578c83c",
+    "migrations_dir": "backend/migrations"
+  }],
+  // Prepared only for a separately approved staging deployment after
+  // Email Sending domain onboarding. No local binding is remote, and the
+  // Worker does not call this adapter while invitation flags are false.
+  "send_email": [
+    {
+      "name": "EMAIL_ACK",
+      "allowed_sender_addresses": ["invitations@digiwongadude.com"]
+    },
+    {
+      "name": "EMAIL_REVIEW",
+      "destination_address": "invitations@digiwongadude.com",
+      "allowed_sender_addresses": ["invitations@digiwongadude.com"]
+    }
+  ],
+  // Account had no Workers at preflight. Separate from local config 5001/5002.
+  "ratelimits": [
+    { "name": "REQUEST_LIMIT", "namespace_id": "5003", "simple": { "limit": 120, "period": 60 } },
+    { "name": "CREATE_LIMIT", "namespace_id": "5004", "simple": { "limit": 5, "period": 60 } }
+  ]
+}

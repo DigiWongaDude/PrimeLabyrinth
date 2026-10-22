@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#090d14">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https: http://localhost:8787; base-uri 'none'; form-action 'self'">
   <title>The Between — Prime Labyrinth</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -30,11 +32,79 @@
           <button type="button" role="menuitem" data-generation="2">Generation 2 · Path architecture</button>
           <button type="button" role="menuitem" data-generation="3">Generation 3 · Room shapes</button>
           <button type="button" role="menuitem" data-generation="4">Generation 4 · Cutaway + rotation</button>
+          <button type="button" role="menuitem" data-generation="5">Generation 5 · Saved journey (beta)</button>
         </div>
       </div>
       <button id="full" type="button">Full screen</button>
+      <a id="request-invitation" href="invitation-request.html">Request an invitation</a>
     </nav>
   </main>
+  <dialog id="journey-dialog" aria-labelledby="journey-title">
+    <h2 id="journey-title">G5 · Your ball of string</h2>
+    <p>Your route stays private. Every validated G5 visit contributes to our shared map. First discoveries credit your public traveller ID and display name.</p>
+    <p id="journey-message" role="status">Connect to create or resume a traveller.</p>
+    <p id="shared-exploration"></p>
+    <p id="shared-discovery"></p>
+    <section id="account-panel" aria-label="Traveller account">
+      <p id="account-identity">Sign in on any device to resume the same traveller.</p>
+      <form id="account-form">
+        <label for="account-username">Username (3–32 letters, numbers or underscores)</label>
+        <input id="account-username" autocomplete="username" minlength="3" maxlength="32">
+        <label for="account-password">Password (15–128 characters)</label>
+        <input id="account-password" type="password" autocomplete="current-password" minlength="15" maxlength="128">
+        <label for="account-name">Public display name</label>
+        <input id="account-name" autocomplete="nickname" maxlength="40" value="Traveller">
+        <label for="account-invitation">Private invitation (new accounts only)</label>
+        <input id="account-invitation" type="password" autocomplete="off" spellcheck="false" maxlength="64" aria-describedby="account-invitation-help">
+        <p id="account-invitation-help">New password and Google accounts need a single-use invitation. Leave this blank to sign in to an existing account. Keep your invitation privately; it is cleared after an attempt and is never saved in this browser.</p>
+        <div class="journey-actions">
+          <button type="submit">Sign in</button>
+          <button id="account-signup" type="button">Create invited account</button>
+          <button id="account-google" type="button">Sign in with Google</button>
+          <button id="account-resume" type="button">Resume account</button>
+          <button id="account-logout" type="button">Sign out</button>
+        </div>
+      </form>
+      <details>
+        <summary>Account settings and recovery</summary>
+        <p>For settings, sign in within the last ten minutes. Display-name changes update your public credit; your original discoveries remain yours.</p>
+        <div class="journey-actions">
+          <button id="account-rename" type="button">Save display name</button>
+          <button id="account-link" type="button">Link Google account</button>
+          <button id="account-key" type="button">Replace recovery key</button>
+        </div>
+        <label for="account-new-password">New password</label>
+        <input id="account-new-password" type="password" autocomplete="new-password" minlength="15" maxlength="128">
+        <button id="account-password-save" type="button">Change password</button>
+        <p>Recover with your public traveller ID and private recovery key. Recovery replaces that key and signs out all devices. Choose a username and new password above.</p>
+        <label for="account-public-id">Public traveller ID</label>
+        <input id="account-public-id" autocomplete="off" maxlength="32">
+        <label for="account-recovery">Private account recovery key</label>
+        <input id="account-recovery" type="password" autocomplete="off" maxlength="64">
+        <button id="account-recover" type="button">Recover account</button>
+        <p id="account-key-notice" hidden>Save this private key now. It is shown once; it will not be saved in this browser.</p>
+        <output id="account-key-output"></output>
+        <p>Deleting your account removes login details and anonymises your public name. The shared discovery ledger retains your anonymous credit.</p>
+        <label for="account-delete-confirmation">Type DELETE MY ACCOUNT to confirm</label>
+        <input id="account-delete-confirmation" autocomplete="off">
+        <button id="account-delete" type="button">Delete and anonymise account</button>
+      </details>
+    </section>
+    <details>
+    <summary>Earlier recovery-code travellers</summary>
+    <label for="recovery-code">Private recovery code (only to resume on another browser)</label>
+    <input id="recovery-code" type="password" autocomplete="off" spellcheck="false" maxlength="64">
+    <p>Keep this code private: anyone holding it can move your traveller. A public path link never includes it.</p>
+    <div class="journey-actions">
+      <button id="journey-connect" type="button">Connect / retry</button>
+      <button id="journey-export" type="button">Copy recovery code</button>
+      <button id="account-upgrade" type="button">Keep this traveller and add password login</button>
+      <button id="account-google-upgrade" type="button">Keep this traveller and add Google login</button>
+    </div>
+    </details>
+    <button id="journey-close" type="button">Close</button>
+  </dialog>
+  <button id="journey-manage" type="button" hidden>Saved journey</button>
   <script type="module" src="app.js"></script>
 </body>
 </html>

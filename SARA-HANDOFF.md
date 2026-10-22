@@ -1,0 +1,58 @@
+# For Sara — from CODiE
+
+**Update, 2026-10-18:** Paul's approved issue #36 backend staging deployment is
+complete. Both migrations are verified; eight hosted smoke checks passed with
+registration closed and zero player records. See [STAGING-HANDOFF.md](STAGING-HANDOFF.md)
+for the URL, configuration, rollback and next approval. The live game is untouched.
+The implementation notes below describe the earlier local acceptance milestone.
+
+I picked up issue #34 and implemented G5 Stage A on `codex/g5-persistence`,
+branched from the live `gh-pages` baseline `1fd2cc6`. The live game is untouched.
+
+G5 now has a Worker/D1 persistence prototype with private traveller credentials,
+immutable full-path visits, an independently mutable active ball of string,
+server-verified doors and atomic retry-safe moves. Retracing does not delete history.
+Same-triple visits on different full paths are separate records. World occupancy
+has a reserved schema only: no floors, ladders, collision or overwrite rules yet.
+
+Paul clarified that ALL players contribute to one exploration, not isolated
+personal maps. This is now implemented for every connected G5 traveller:
+
+- `discoveries` is global, keyed by generation + starting triple + full path.
+  Traveller ID is attribution only, never part of that identity.
+- Personal `visits` remain private. Two players following the same path share
+  one discovery, while different paths to the same triple remain distinct.
+- A visit trigger saves global discovery in the same transaction as the personal
+  history/command. Simultaneous arrivals, retries and retracing cannot duplicate it.
+- First successful commit owns discovery permanently, not first response receipt.
+  Migration backfills earliest old timestamps, with deterministic ID tie-breaking
+  when old timestamps tie. No claim of exact historical ordering in that case.
+- `GET /v1/exploration` exposes actual database totals and recent discoveries,
+  never owner IDs or private histories. G5's dialog shows collective counts and
+  current-location attribution separately from personal history.
+- G1–G4 stay untouched/offline; they do not yet contribute centrally. No AI images
+  have been generated. The later image archive still needs its separate
+  Edition + canonical path + renderer-version identity and completion ownership.
+
+G1–G4 remain compatible and G4 is still the default. `engine.js` and `view.js` are
+byte-for-byte unchanged in Git. G5 deliberately uses G4 geometry and has its own
+save slot. Public links do not disclose the private traveller recovery code.
+
+Verification: 18 Worker/D1 + client integration tests and 18 engine/view/app tests
+pass. Type checking and Worker bundle dry-run pass. A separate local HTTP smoke
+test travelled ROOT → 0 → 00, resumed using the same credential in a second
+independent client storage context, retraced to 0, and confirmed all three visits
+still existed by querying persistent local D1. No live Cloudflare test or tablet
+acceptance test has been claimed.
+
+The extended local HTTP smoke check also creates an entirely different traveller,
+follows the same three locations, and verifies that only personal contributions
+increase: no duplicate global discoveries, and the first traveller's route stays
+unchanged. Migration tests verify old save rows survive `0001` → `0002` unchanged.
+
+Next: please review the draft PR and staging handoff. We still need Paul's approval
+for an isolated frontend origin and controlled invited registration before the
+two-device test. Keep the existing website, DNS and GitHub Pages unchanged. The
+frontend API address remains blank, registrations are closed, and no AI/image
+storage or paid-plan activation was needed. Only after the hosted two-device gate
+should we discuss live deployment, public registration and the later AI archive.

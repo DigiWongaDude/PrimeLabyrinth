@@ -1,0 +1,27 @@
+{
+  "name": "between-g5-persistence",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:client": "node --test tests/*.test.mjs",
+    "check": "wrangler types && tsc --noEmit",
+    "dev:api": "wrangler dev --local",
+    "dev:accounts": "wrangler dev --local --ip 127.0.0.1 --var ACCOUNTS_ENABLED:true --var REGISTRATION_ENABLED:true",
+    "dev:web": "node serve.mjs",
+    "build:pages-preview": "node tools/build-pages-preview.mjs",
+    "smoke:local": "node smoke.mjs",
+    "migrate:local": "wrangler d1 migrations apply between-g5 --local",
+    "build:api": "wrangler deploy --dry-run --outdir .worker-build"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.4.4",
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5",
+    "wrangler": "^4.151.1"
+  },
+  "dependencies": {
+    "jose": "^6.2.12"
+  }
+}
